@@ -14,6 +14,7 @@ export const apiService = {
   // Datasets
   getDatasets: () => api.get<DatasetMetadata[]>('/datasets').then(r => r.data),
   getDataset: (id: string) => api.get<DatasetMetadata>(`/datasets/${id}`).then(r => r.data),
+  deleteDataset: (id: string) => api.delete<{ status: string; dataset_id: string }>(`/datasets/${id}`).then(r => r.data),
   getPreview: (id: string, limit = 50) => api.get<{ columns: string[]; rows: any[]; total_rows: number }>(`/datasets/${id}/preview?limit=${limit}`).then(r => r.data),
   uploadDataset: (file: File) => {
     const formData = new FormData();

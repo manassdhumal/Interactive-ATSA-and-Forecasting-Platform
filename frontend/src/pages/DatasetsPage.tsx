@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { apiService } from '../services/api';
 import {
   Upload, Download, CheckCircle, AlertTriangle,
-  Sparkles, ArrowRight, ShieldCheck, Activity, Zap
+  Sparkles, ArrowRight, ShieldCheck, Activity, Zap, Trash2
 } from 'lucide-react';
 
 export const DatasetsPage: React.FC = () => {
@@ -85,6 +85,21 @@ export const DatasetsPage: React.FC = () => {
       setSelectedDataset(res.dataset);
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Preprocessing error');
+    }
+  };
+
+  const handleDeleteDataset = async (datasetId: string, datasetName: string) => {
+    if (!window.confirm(`Are you sure you want to delete dataset "${datasetName}"?`)) {
+      return;
+    }
+    try {
+      await apiService.deleteDataset(datasetId);
+      await refreshDatasets();
+      if (selectedDataset?.id === datasetId) {
+        setSelectedDataset(null);
+      }
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Failed to delete dataset');
     }
   };
 
@@ -307,6 +322,13 @@ export const DatasetsPage: React.FC = () => {
                 >
                   <Download className="w-3.5 h-3.5" />
                 </a>
+                <button
+                  onClick={() => handleDeleteDataset(d.id, d.name)}
+                  className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-transparent hover:border-rose-500/30 transition"
+                  title="Delete Dataset"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
             </div>
           );

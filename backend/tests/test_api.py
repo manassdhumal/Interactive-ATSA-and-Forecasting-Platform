@@ -112,3 +112,17 @@ def test_model_comparison():
     assert "comparison_table" in res
     assert len(res["comparison_table"]) >= 3
     assert res["best_model"] is not None
+
+def test_delete_dataset():
+    # Test deleting a dataset
+    del_res = client.delete("/api/datasets/sample-daily-demand")
+    assert del_res.status_code == 200
+    assert del_res.json()["status"] == "deleted"
+
+    # Verify it is no longer listed
+    list_res = client.get("/api/datasets")
+    assert "sample-daily-demand" not in [d["id"] for d in list_res.json()]
+
+    # Test deleting nonexistent returns 404
+    del_again = client.delete("/api/datasets/sample-daily-demand")
+    assert del_again.status_code == 404

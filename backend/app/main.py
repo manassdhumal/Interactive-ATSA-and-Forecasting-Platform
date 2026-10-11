@@ -9,7 +9,7 @@ from app.schemas.schemas import (
     ModelComparisonRequest
 )
 from app.services.dataset_service import (
-    get_all_datasets, get_dataset, upload_dataset
+    get_all_datasets, get_dataset, upload_dataset, delete_dataset
 )
 from app.services.preprocessing_service import preprocess_dataset
 from app.services.suggestion_service import analyze_and_suggest_transformations
@@ -46,6 +46,13 @@ def health_check():
 @app.get("/api/datasets")
 def list_datasets():
     return get_all_datasets()
+
+@app.delete("/api/datasets/{dataset_id}")
+def delete_dataset_endpoint(dataset_id: str):
+    success = delete_dataset(dataset_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Dataset not found or already deleted")
+    return {"status": "deleted", "dataset_id": dataset_id}
 
 @app.get("/api/datasets/{dataset_id}")
 def dataset_details(dataset_id: str):

@@ -89,6 +89,12 @@ def get_all_datasets() -> List[Dict[str, Any]]:
 def get_dataset(dataset_id: str) -> Optional[Dict[str, Any]]:
     return DATASETS_STORE.get(dataset_id)
 
+def delete_dataset(dataset_id: str) -> bool:
+    if dataset_id in DATASETS_STORE:
+        del DATASETS_STORE[dataset_id]
+        return True
+    return False
+
 def upload_dataset(filename: str, content: bytes) -> Dict[str, Any]:
     dataset_id = str(uuid.uuid4())[:8]
     if filename.endswith(".csv"):
