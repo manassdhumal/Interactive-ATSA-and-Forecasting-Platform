@@ -24,6 +24,20 @@ export const apiService = {
   },
   preprocess: (id: string, target_col: string, time_col: string, action: string, params: any = {}) =>
     api.post(`/datasets/${id}/preprocess`, { target_col, time_col, action, params }).then(r => r.data),
+  getSuggestions: (id: string, target_col: string) =>
+    api.get<{
+      dataset_id: string;
+      target_col: string;
+      profile: Record<string, any>;
+      suggestions: {
+        action: string;
+        title: string;
+        priority: 'high' | 'medium' | 'info';
+        reason: string;
+        params: Record<string, any>;
+        button_label: string;
+      }[];
+    }>(`/datasets/${id}/suggestions/${target_col}`).then(r => r.data),
   getDownloadUrl: (id: string) => `/api/datasets/${id}/download`,
 
   // Exploration

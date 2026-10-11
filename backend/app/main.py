@@ -12,6 +12,7 @@ from app.services.dataset_service import (
     get_all_datasets, get_dataset, upload_dataset
 )
 from app.services.preprocessing_service import preprocess_dataset
+from app.services.suggestion_service import analyze_and_suggest_transformations
 from app.services.exploration_service import (
     get_descriptive_statistics, get_rolling_and_trend, compute_decomposition, compute_lags
 )
@@ -79,6 +80,13 @@ def preprocess_endpoint(dataset_id: str, req: PreprocessRequest):
     try:
         res = preprocess_dataset(dataset_id, req.target_col, req.time_col, req.action, req.params)
         return res
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/datasets/{dataset_id}/suggestions/{target_col}")
+def suggestions_endpoint(dataset_id: str, target_col: str):
+    try:
+        return analyze_and_suggest_transformations(dataset_id, target_col)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
