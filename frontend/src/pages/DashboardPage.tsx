@@ -5,11 +5,11 @@ import { DescriptiveStats, RollingTrendData } from '../types';
 import { Link } from 'react-router-dom';
 import {
   Activity, TrendingUp, Calendar, AlertCircle, Database,
-  ArrowRight, ShieldCheck, Cpu, GitCompare, BarChart2
+  ArrowRight, ShieldCheck, Cpu, GitCompare, BarChart2, Sparkles, Zap
 } from 'lucide-react';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid
+  CartesianGrid, Area, AreaChart
 } from 'recharts';
 
 export const DashboardPage: React.FC = () => {
@@ -34,8 +34,8 @@ export const DashboardPage: React.FC = () => {
     }
   }, [selectedDataset, selectedTarget]);
 
-  const chartPoints = (plotData?.timestamps || []).slice(-80).map((t, idx) => {
-    const origIdx = (plotData?.timestamps.length || 0) - 80 + idx;
+  const chartPoints = (plotData?.timestamps || []).slice(-90).map((t, idx) => {
+    const origIdx = (plotData?.timestamps.length || 0) - 90 + idx;
     return {
       time: t.slice(0, 10),
       value: plotData?.values[origIdx],
@@ -46,78 +46,97 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Title & Quick Stats */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Platform Overview</h1>
-          <p className="text-sm text-slate-400">
-            Real-time ATSA statistical workbench & forecasting pipeline
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            to="/datasets"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
-          >
-            <Database className="w-3.5 h-3.5 text-emerald-400" />
-            Upload Dataset
-          </Link>
-          <Link
-            to="/model-comparison"
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium shadow-md shadow-blue-600/20 transition"
-          >
-            <GitCompare className="w-3.5 h-3.5" />
-            Compare Models
-          </Link>
+      {/* Hero Welcome & Actions Header */}
+      <div className="relative overflow-hidden rounded-2xl p-6 glass-panel border border-white/10 shadow-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/20 to-slate-900/60">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono uppercase tracking-wider flex items-center gap-1">
+                <Sparkles className="w-3 h-3 text-cyan-400" />
+                Autonomous ATSA Engine
+              </span>
+            </div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-white">
+              Analytical Time Series & Forecasting Workbench
+            </h1>
+            <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+              Real-time statistical estimation, unit-root hypothesis testing, decomposition, and model benchmarking on genuine Python statsmodels computations.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2.5">
+            <Link
+              to="/datasets"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700/80 shadow-md transition"
+            >
+              <Database className="w-3.5 h-3.5 text-emerald-400" />
+              Ingest Data / Ticker
+            </Link>
+            <Link
+              to="/model-comparison"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/30 transition"
+            >
+              <GitCompare className="w-3.5 h-3.5" />
+              Compare Models
+            </Link>
+          </div>
         </div>
       </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-4">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>Total Loaded Datasets</span>
-            <Database className="w-4 h-4 text-emerald-400" />
+        <div className="glass-panel glass-panel-hover rounded-2xl p-4.5 border border-white/5 relative overflow-hidden group">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <span>Datasets in Library</span>
+            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+              <Database className="w-4 h-4" />
+            </div>
           </div>
-          <div className="mt-2 text-2xl font-bold text-white font-mono">{datasets.length}</div>
-          <div className="mt-1 text-[11px] text-slate-400">5 built-in synthetic ATSA benchmarks</div>
+          <div className="mt-2 text-2xl font-extrabold text-white font-mono">{datasets.length}</div>
+          <div className="mt-1 text-[11px] text-slate-400">Benchmarks & Market Feeds</div>
         </div>
 
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-4">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>Observations in Series</span>
-            <Activity className="w-4 h-4 text-blue-400" />
+        <div className="glass-panel glass-panel-hover rounded-2xl p-4.5 border border-white/5 relative overflow-hidden group">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <span>Series Observations</span>
+            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+              <Activity className="w-4 h-4" />
+            </div>
           </div>
-          <div className="mt-2 text-2xl font-bold text-white font-mono">
+          <div className="mt-2 text-2xl font-extrabold text-white font-mono">
             {stats?.count ?? selectedDataset?.total_rows ?? 0}
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">
-            Target: <span className="text-slate-300 font-medium">{selectedTarget || 'None'}</span>
+          <div className="mt-1 text-[11px] text-slate-400 truncate">
+            Target: <span className="text-cyan-300 font-semibold">{selectedTarget || 'None'}</span>
           </div>
         </div>
 
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-4">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>Mean & Std. Dev</span>
-            <BarChart2 className="w-4 h-4 text-violet-400" />
+        <div className="glass-panel glass-panel-hover rounded-2xl p-4.5 border border-white/5 relative overflow-hidden group">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <span>Mean & Dispersion</span>
+            <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
+              <BarChart2 className="w-4 h-4" />
+            </div>
           </div>
-          <div className="mt-2 text-xl font-bold text-white font-mono">
+          <div className="mt-2 text-xl font-extrabold text-white font-mono">
             {stats ? `${stats.mean.toFixed(2)}` : '—'}
             <span className="text-xs text-slate-400 font-normal ml-1.5">
               (±{stats?.std.toFixed(2)})
             </span>
           </div>
-          <div className="mt-1 text-[11px] text-slate-400">
-            Min: {stats?.min.toFixed(1)} / Max: {stats?.max.toFixed(1)}
+          <div className="mt-1 text-[11px] text-slate-400 font-mono">
+            [{stats?.min.toFixed(1)} … {stats?.max.toFixed(1)}]
           </div>
         </div>
 
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-4">
-          <div className="flex items-center justify-between text-slate-400 text-xs">
-            <span>Trend Trajectory</span>
-            <TrendingUp className="w-4 h-4 text-amber-400" />
+        <div className="glass-panel glass-panel-hover rounded-2xl p-4.5 border border-white/5 relative overflow-hidden group">
+          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+            <span>Estimated Drift</span>
+            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+              <TrendingUp className="w-4 h-4" />
+            </div>
           </div>
-          <div className="mt-2 text-sm font-semibold text-slate-200">
+          <div className="mt-2 text-sm font-bold text-slate-200 truncate">
             {plotData?.trend_summary?.interpretation || 'Calculating...'}
           </div>
           <div className="mt-1 text-[11px] text-slate-400 font-mono">
@@ -126,98 +145,126 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Chart Card */}
-      <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-4">
+      {/* Main Trajectory Chart Card */}
+      <div className="glass-panel rounded-2xl p-5 border border-white/5">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4">
           <div>
-            <h2 className="text-base font-semibold text-white">Active Series Trajectory</h2>
+            <h2 className="text-base font-bold text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500"></span>
+              Active Series Trajectory & Moving Dynamics
+            </h2>
             <p className="text-xs text-slate-400">
-              Observed historical values with 7-period rolling mean and linear trend line
+              Observed historical values with 7-period moving average and fitted OLS trend line
             </p>
           </div>
-          <div className="flex items-center gap-4 text-xs">
+          <div className="flex items-center gap-4 text-xs font-medium">
             <span className="flex items-center gap-1.5 text-blue-400">
-              <span className="w-3 h-0.5 bg-blue-500 rounded"></span> Actual
+              <span className="w-3 h-1 bg-blue-500 rounded-full"></span> Actual Series
             </span>
             <span className="flex items-center gap-1.5 text-amber-400">
-              <span className="w-3 h-0.5 bg-amber-500 rounded"></span> Rolling (w=7)
+              <span className="w-3 h-1 bg-amber-500 rounded-full"></span> Rolling (w=7)
             </span>
             <span className="flex items-center gap-1.5 text-emerald-400">
-              <span className="w-3 h-0.5 bg-emerald-500 border-dashed rounded"></span> Trend
+              <span className="w-3 h-1 bg-emerald-500 border-dashed rounded-full"></span> Trend
             </span>
           </div>
         </div>
 
         <div className="h-72 w-full">
           {loading ? (
-            <div className="h-full flex items-center justify-center text-slate-400 text-sm">
-              Calculating statistical series...
+            <div className="h-full flex items-center justify-center text-slate-400 text-xs font-mono">
+              Computing statistical series trajectory...
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartPoints}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 11 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 11 }} domain={['auto', 'auto']} />
+              <AreaChart data={chartPoints}>
+                <defs>
+                  <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
+                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }}
+                  contentStyle={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    backdropFilter: 'blur(8px)',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    borderRadius: '12px',
+                    fontSize: '11px',
+                    boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+                  }}
                 />
-                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="rolling" stroke="#f59e0b" strokeWidth={1.5} dot={false} />
+                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#actualGrad)" dot={false} />
+                <Line type="monotone" dataKey="rolling" stroke="#f59e0b" strokeWidth={1.75} dot={false} />
                 <Line type="monotone" dataKey="trend" stroke="#10b981" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           )}
         </div>
       </div>
 
-      {/* Model Quick Access Grid */}
+      {/* Model Quick Access Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link
           to="/models/arma"
-          className="group bg-[#101728] border border-slate-800 hover:border-blue-500/50 rounded-xl p-4 transition-all"
+          className="glass-panel glass-panel-hover rounded-2xl p-5 border border-white/5 group transition"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 font-bold">
               ARMA(p, q)
             </span>
-            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-400 group-hover:translate-x-1 transition" />
+            <div className="w-7 h-7 rounded-full bg-slate-800/80 group-hover:bg-blue-600 flex items-center justify-center text-slate-400 group-hover:text-white transition">
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+            </div>
           </div>
-          <h3 className="text-sm font-semibold text-white">Autoregressive Moving Average</h3>
-          <p className="text-xs text-slate-400 mt-1">
+          <h3 className="text-sm font-bold text-white group-hover:text-blue-300 transition">
+            Autoregressive Moving Average
+          </h3>
+          <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
             Stationary stochastic process modeling with statsmodels state-space exact likelihood estimation.
           </p>
         </Link>
 
         <Link
           to="/models/arima"
-          className="group bg-[#101728] border border-slate-800 hover:border-cyan-500/50 rounded-xl p-4 transition-all"
+          className="glass-panel glass-panel-hover rounded-2xl p-5 border border-white/5 group transition"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-bold">
               ARIMA(p, d, q)
             </span>
-            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition" />
+            <div className="w-7 h-7 rounded-full bg-slate-800/80 group-hover:bg-cyan-600 flex items-center justify-center text-slate-400 group-hover:text-white transition">
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+            </div>
           </div>
-          <h3 className="text-sm font-semibold text-white">Autoregressive Integrated MA</h3>
-          <p className="text-xs text-slate-400 mt-1">
-            Handles non-stationary series with order-d differencing and confidence interval forecasting.
+          <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition">
+            Integrated ARIMA & Auto-Search
+          </h3>
+          <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            Handles non-stationary series with order-d differencing and 1-click automated AIC grid search.
           </p>
         </Link>
 
         <Link
           to="/models/sarima"
-          className="group bg-[#101728] border border-slate-800 hover:border-violet-500/50 rounded-xl p-4 transition-all"
+          className="glass-panel glass-panel-hover rounded-2xl p-5 border border-white/5 group transition"
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-violet-500/10 text-violet-400 border border-violet-500/20">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 font-bold">
               SARIMA(p,d,q)(P,D,Q)s
             </span>
-            <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-violet-400 group-hover:translate-x-1 transition" />
+            <div className="w-7 h-7 rounded-full bg-slate-800/80 group-hover:bg-violet-600 flex items-center justify-center text-slate-400 group-hover:text-white transition">
+              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
+            </div>
           </div>
-          <h3 className="text-sm font-semibold text-white">Seasonal ARIMA</h3>
-          <p className="text-xs text-slate-400 mt-1">
-            Multiplicative seasonal lag structure for annual, weekly, and monthly cyclical patterns.
+          <h3 className="text-sm font-bold text-white group-hover:text-violet-300 transition">
+            Seasonal Multiplicative ARIMA
+          </h3>
+          <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+            Multiplicative seasonal lag structure capturing weekly, monthly, and annual cyclical patterns.
           </p>
         </Link>
       </div>
