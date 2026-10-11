@@ -9,15 +9,15 @@ from app.schemas.schemas import (
     ModelComparisonRequest
 )
 from app.services.dataset_service import (
-    get_all_datasets, get_dataset, upload_dataset, delete_dataset
+    get_all_datasets, get_dataset, upload_dataset, delete_dataset, fetch_public_ticker_data
 )
 from app.services.preprocessing_service import preprocess_dataset
 from app.services.suggestion_service import analyze_and_suggest_transformations
 from app.services.exploration_service import (
     get_descriptive_statistics, get_rolling_and_trend, compute_decomposition, compute_lags
 )
-from app.services.diagnostic_service import compute_adf_test, compute_acf_pacf
-from app.services.model_service import fit_time_series_model, get_analysis_result
+from app.services.diagnostic_service import compute_adf_test, compute_kpss_test, compute_acf_pacf
+from app.services.model_service import fit_time_series_model, get_analysis_result, search_optimal_arima
 from app.services.comparison_service import compare_models
 
 app = FastAPI(
@@ -138,6 +138,13 @@ def lag_analysis_endpoint(req: LagAnalysisRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/api/datasets/fetch-ticker")
+def fetch_ticker_endpoint(ticker: str, period: str = "1y", interval: str = "1d"):
+    try:
+        return fetch_public_ticker_data(ticker, period, interval)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # Diagnostics Endpoints
 @app.post("/api/diagnostics/adf")
 def adf_endpoint(req: ADFRequest):
@@ -146,10 +153,24 @@ def adf_endpoint(req: ADFRequest):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@app.post("/api/diagnostics/kpss")
+def kpss_endpoint(req: ADFRequest):
+    try:
+        return compute_kpss_test(req.dataset_id, req.target_col, req.regression)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @app.post("/api/diagnostics/acf_pacf")
 def acf_pacf_endpoint(req: ACFPACFRequest):
     try:
         return compute_acf_pacf(req.dataset_id, req.target_col, req.nlags)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/models/auto-arima/{dataset_id}/{target_column}")
+def auto_arima_endpoint(dataset_id: str, target_column: str, max_p: int = 3, max_d: int = 2, max_q: int = 3):
+    try:
+        return search_optimal_arima(dataset_id, target_column, max_p, max_d, max_q)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

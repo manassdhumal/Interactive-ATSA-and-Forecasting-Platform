@@ -4,7 +4,7 @@ import { apiService } from '../services/api';
 import { DescriptiveStats, RollingTrendData, DecompositionData } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, ScatterChart, Scatter
+  CartesianGrid, ScatterChart, Scatter, Brush
 } from 'recharts';
 import { Layers, Activity, Sliders, TrendingUp } from 'lucide-react';
 
@@ -16,7 +16,7 @@ export const ExplorePage: React.FC = () => {
   const [lagsData, setLagsData] = useState<Record<string, { x: number; y: number }[]> | null>(null);
   const [rollingWindow, setRollingWindow] = useState(7);
   const [decompPeriod, setDecompPeriod] = useState(12);
-  const [decompModel, setDecompModel] = useState<'additive' | 'multiplicative'>('additive');
+  const [decompModel, setDecompModel] = useState<'additive' | 'multiplicative' | 'stl'>('additive');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -123,17 +123,18 @@ export const ExplorePage: React.FC = () => {
               <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={1.5} dot={false} name="Actual" />
               <Line type="monotone" dataKey="rolling" stroke="#f59e0b" strokeWidth={2} dot={false} name="Rolling Mean" />
               <Line type="monotone" dataKey="std" stroke="#a855f7" strokeWidth={1.5} strokeDasharray="3 3" dot={false} name="Rolling Std" />
+              <Brush dataKey="time" height={25} stroke="#38bdf8" fill="#0f172a" tickFormatter={(t) => t.slice(5)} />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* 4-Panel Classical Time Series Decomposition */}
+      {/* 4-Panel Time Series Decomposition */}
       <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
           <div>
-            <h2 className="text-base font-semibold text-white">Classical Decomposition (Observed = Trend + Seasonal + Residual)</h2>
-            <p className="text-xs text-slate-400">Additive or multiplicative decomposition into isolated components</p>
+            <h2 className="text-base font-semibold text-white">Time Series Decomposition (Observed = Trend + Seasonal + Residual)</h2>
+            <p className="text-xs text-slate-400">Classical Additive/Multiplicative or LOESS-based STL decomposition</p>
           </div>
           <div className="flex items-center gap-3 text-xs">
             <select
@@ -141,8 +142,9 @@ export const ExplorePage: React.FC = () => {
               onChange={(e) => setDecompModel(e.target.value as any)}
               className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-200"
             >
-              <option value="additive">Additive Decomposition</option>
-              <option value="multiplicative">Multiplicative Decomposition</option>
+              <option value="additive">Classical Additive</option>
+              <option value="multiplicative">Classical Multiplicative</option>
+              <option value="stl">STL (LOESS Robust Decomposition)</option>
             </select>
             <div className="flex items-center gap-1.5">
               <span className="text-slate-400">Period (s):</span>

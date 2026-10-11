@@ -40,6 +40,8 @@ export const apiService = {
       }[];
     }>(`/datasets/${id}/suggestions/${target_col}`).then(r => r.data),
   getDownloadUrl: (id: string) => `/api/datasets/${id}/download`,
+  fetchTicker: (ticker: string, period = '1y', interval = '1d') =>
+    api.post<DatasetMetadata>(`/datasets/fetch-ticker?ticker=${encodeURIComponent(ticker)}&period=${period}&interval=${interval}`).then(r => r.data),
 
   // Exploration
   getStats: (id: string, target: string) => api.get<DescriptiveStats>(`/exploration/statistics/${id}/${target}`).then(r => r.data),
@@ -53,8 +55,21 @@ export const apiService = {
   // Diagnostics
   getAdf: (dataset_id: string, target_col: string, regression = 'c') =>
     api.post<ADFResult>('/diagnostics/adf', { dataset_id, target_col, regression }).then(r => r.data),
+  getKpss: (dataset_id: string, target_col: string, regression = 'c') =>
+    api.post<ADFResult>('/diagnostics/kpss', { dataset_id, target_col, regression }).then(r => r.data),
   getAcfPacf: (dataset_id: string, target_col: string, nlags = 30) =>
     api.post<ACFPACFResult>('/diagnostics/acf_pacf', { dataset_id, target_col, nlags }).then(r => r.data),
+
+  // Models
+  getAutoArima: (dataset_id: string, target_column: string, max_p = 3, max_d = 2, max_q = 3) =>
+    api.get<{
+      dataset_id: string;
+      best_p: number;
+      best_d: number;
+      best_q: number;
+      best_aic: number;
+      top_candidates: { p: number; d: number; q: number; aic: number; bic: number }[];
+    }>(`/models/auto-arima/${dataset_id}/${target_column}?max_p=${max_p}&max_d=${max_d}&max_q=${max_q}`).then(r => r.data),
 
   // Models
   fitModel: (dataset_id: string, target_column: string, model: string, parameters: any, forecast_horizon = 12, confidence_level = 0.95) =>

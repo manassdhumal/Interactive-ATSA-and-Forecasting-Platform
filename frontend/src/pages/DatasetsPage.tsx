@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { apiService } from '../services/api';
 import {
   Upload, Download, CheckCircle, AlertTriangle,
-  Sparkles, ArrowRight, ShieldCheck, Activity, Zap, Trash2
+  Sparkles, ArrowRight, ShieldCheck, Activity, Zap, Trash2, Globe
 } from 'lucide-react';
 
 export const DatasetsPage: React.FC = () => {
@@ -13,6 +13,11 @@ export const DatasetsPage: React.FC = () => {
   const [previewData, setPreviewData] = useState<{ columns: string[]; rows: any[]; total_rows: number } | null>(null);
   const [preprocessAction, setPreprocessAction] = useState('interpolate');
   const [preprocessResult, setPreprocessResult] = useState<string | null>(null);
+
+  // Direct Web/API ticker fetching state
+  const [tickerInput, setTickerInput] = useState('');
+  const [tickerPeriod, setTickerPeriod] = useState('1y');
+  const [fetchingTicker, setFetchingTicker] = useState(false);
 
   // Recommendation engine state
   const [suggestionsData, setSuggestionsData] = useState<{
@@ -57,6 +62,21 @@ export const DatasetsPage: React.FC = () => {
       setUploadError(err.response?.data?.detail || err.message || 'Upload failed');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleFetchTicker = async () => {
+    if (!tickerInput.trim()) return;
+    setFetchingTicker(true);
+    try {
+      const meta = await apiService.fetchTicker(tickerInput.trim(), tickerPeriod);
+      await refreshDatasets();
+      setSelectedDataset(meta);
+      setTickerInput('');
+    } catch (err: any) {
+      alert(err.response?.data?.detail || err.message || 'Market fetch failed');
+    } finally {
+      setFetchingTicker(false);
     }
   };
 
@@ -112,23 +132,74 @@ export const DatasetsPage: React.FC = () => {
         </p>
       </div>
 
-      {/* Upload Box */}
-      <div className="bg-[#101728] border-2 border-dashed border-slate-700/80 hover:border-blue-500/60 rounded-xl p-6 text-center transition">
-        <Upload className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-        <h3 className="text-sm font-semibold text-white">Upload Time Series File</h3>
-        <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-          Supports CSV (.csv) and Excel (.xlsx, .xls) files. Automatically parses timestamps, detects target columns, and provides diagnostic transformation suggestions.
-        </p>
-        <label className="mt-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium cursor-pointer shadow-md shadow-blue-600/20 transition">
-          <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="hidden" />
-          {uploading ? 'Processing & Validating...' : 'Select File from Device'}
-        </label>
-        {uploadError && (
-          <div className="mt-3 text-xs text-rose-400 flex items-center justify-center gap-1.5">
-            <AlertTriangle className="w-3.5 h-3.5" />
-            {uploadError}
+      {/* Data Ingestion: Upload File OR Fetch Public Market Ticker */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Upload Box */}
+        <div className="bg-[#101728] border-2 border-dashed border-slate-700/80 hover:border-blue-500/60 rounded-xl p-6 text-center transition flex flex-col justify-between">
+          <div>
+            <Upload className="w-8 h-8 text-blue-400 mx-auto mb-2" />
+            <h3 className="text-sm font-semibold text-white">Upload Local File</h3>
+            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              Supports CSV (.csv) and Excel (.xlsx, .xls) files. Automatically parses timestamps and numeric target series.
+            </p>
           </div>
-        )}
+          <div className="mt-4">
+            <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium cursor-pointer shadow-md shadow-blue-600/20 transition">
+              <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="hidden" />
+              {uploading ? 'Processing & Validating...' : 'Select File from Device'}
+            </label>
+            {uploadError && (
+              <div className="mt-3 text-xs text-rose-400 flex items-center justify-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
+                {uploadError}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Live Public Web & Financial Market API Fetch Box */}
+        <div className="bg-[#101728] border border-slate-800 rounded-xl p-6 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Globe className="w-5 h-5 text-cyan-400" />
+              <h3 className="text-sm font-semibold text-white">Direct Web & Market API Fetch</h3>
+            </div>
+            <p className="text-xs text-slate-400">
+              Fetch real-world time-series data directly from public financial markets (Yahoo Finance) by symbol (e.g., AAPL, NVDA, TSLA, BTC-USD, ^GSPC).
+            </p>
+
+            <div className="mt-4 flex items-center gap-2">
+              <input
+                type="text"
+                placeholder="Ticker symbol (e.g. AAPL, BTC-USD)"
+                value={tickerInput}
+                onChange={(e) => setTickerInput(e.target.value)}
+                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
+              />
+              <select
+                value={tickerPeriod}
+                onChange={(e) => setTickerPeriod(e.target.value)}
+                className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-200"
+              >
+                <option value="6mo">6 Months</option>
+                <option value="1y">1 Year</option>
+                <option value="2y">2 Years</option>
+                <option value="5y">5 Years</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-[11px] text-slate-400">Daily closes adjusted for splits & dividends</span>
+            <button
+              onClick={handleFetchTicker}
+              disabled={fetchingTicker || !tickerInput.trim()}
+              className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-md shadow-cyan-600/20 disabled:opacity-50 transition"
+            >
+              {fetchingTicker ? 'Fetching Market Data...' : 'Import Time Series'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* INTELLIGENT SUGGESTIONS & AUTO-RECOMMENDATIONS */}

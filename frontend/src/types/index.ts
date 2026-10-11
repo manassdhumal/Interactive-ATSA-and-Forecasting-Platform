@@ -129,6 +129,7 @@ export interface ModelFitResult {
     std?: number;
   };
   warnings: string[];
+  python_code?: string;
 }
 
 export interface ModelComparisonResult {

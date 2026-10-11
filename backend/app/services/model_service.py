@@ -248,6 +248,9 @@ def fit_time_series_model(
     # Diagnostics calculation
     diagnostics = compute_residual_diagnostics(residuals, model_df=model_df_val)
     
+    # Add generated Python reproducibility code snippet
+    python_code = generate_python_reproducibility_code(model_type, parameters, forecast_horizon)
+
     analysis_id = str(uuid.uuid4())[:8]
     result = {
         "analysis_id": analysis_id,
@@ -266,11 +269,118 @@ def fit_time_series_model(
         "metrics": metrics,
         "param_estimates": param_estimates,
         "diagnostics": diagnostics,
-        "warnings": warnings
+        "warnings": warnings,
+        "python_code": python_code
     }
     
     ANALYSES_STORE[analysis_id] = result
     return clean_for_json(result)
+
+def search_optimal_arima(
+    dataset_id: str,
+    target_column: str,
+    max_p: int = 3,
+    max_d: int = 2,
+    max_q: int = 3,
+    seasonal: bool = False,
+    s: int = 12
+) -> Dict[str, Any]:
+    """
+    Automated grid search minimizing Akaike Information Criterion (AIC).
+    """
+    ds = get_dataset(dataset_id)
+    if not ds:
+        raise ValueError(f"Dataset '{dataset_id}' not found.")
+    s_series = pd.to_numeric(ds["df"][target_column], errors='coerce').dropna().values
+    
+    best_aic = float("inf")
+    best_order = (1, 1, 1)
+    best_seasonal_order = None
+    results_table = []
+
+    for p in range(max_p + 1):
+        for d in range(max_d + 1):
+            for q in range(max_q + 1):
+                if p == 0 and d == 0 and q == 0:
+                    continue
+                try:
+                    fit = ARIMA(s_series, order=(p, d, q)).fit()
+                    aic_val = float(fit.aic)
+                    bic_val = float(fit.bic)
+                    results_table.append({"p": p, "d": d, "q": q, "aic": round(aic_val, 2), "bic": round(bic_val, 2)})
+                    if aic_val < best_aic:
+                        best_aic = aic_val
+                        best_order = (p, d, q)
+                except Exception:
+                    continue
+
+    sorted_results = sorted(results_table, key=lambda x: x["aic"])[:8]
+    return clean_for_json({
+        "dataset_id": dataset_id,
+        "best_p": best_order[0],
+        "best_d": best_order[1],
+        "best_q": best_order[2],
+        "best_aic": round(best_aic, 2),
+        "top_candidates": sorted_results
+    })
+
+def generate_python_reproducibility_code(model_type: str, parameters: Dict[str, Any], horizon: int) -> str:
+    if model_type in ["arma", "arima", "ar", "ma"]:
+        p = parameters.get("p", 1)
+        d = parameters.get("d", 0)
+        q = parameters.get("q", 0)
+        return f"""# ATSA Reproducibility Script for {model_type.upper()}
+import pandas as pd
+from statsmodels.tsa.arima.model import ARIMA
+
+# Load data and prepare series
+df = pd.read_csv("your_timeseries.csv")
+y = df["target_column"].dropna().values
+
+# Fit {model_type.upper()}({p}, {d}, {q})
+model = ARIMA(y, order=({p}, {d}, {q}))
+results = model.fit()
+
+# Forecast {horizon} steps ahead
+forecast_res = results.get_forecast(steps={horizon})
+forecast = forecast_res.predicted_mean
+conf_int = forecast_res.conf_int(alpha=0.05)
+
+print(results.summary())
+"""
+    elif model_type == "sarima":
+        return f"""# ATSA Reproducibility Script for SARIMA
+import pandas as pd
+from statsmodels.tsa.statespace.sarimax import SARIMAX
+
+df = pd.read_csv("your_timeseries.csv")
+y = df["target_column"].dropna().values
+
+# Fit Seasonal ARIMA
+model = SARIMAX(y, order=({parameters.get('p',1)}, {parameters.get('d',0)}, {parameters.get('q',1)}),
+                seasonal_order=({parameters.get('P',1)}, {parameters.get('D',0)}, {parameters.get('Q',1)}, {parameters.get('s',12)}))
+results = model.fit()
+forecast = results.get_forecast(steps={horizon}).predicted_mean
+print(results.summary())
+"""
+    elif model_type == "holt_winters":
+        return f"""# ATSA Reproducibility Script for Holt-Winters
+import pandas as pd
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
+
+df = pd.read_csv("your_timeseries.csv")
+y = df["target_column"].dropna().values
+
+model = ExponentialSmoothing(y, trend='{parameters.get("trend","add")}', seasonal='{parameters.get("seasonal","add")}', seasonal_periods={parameters.get("period",12)})
+results = model.fit()
+forecast = results.forecast({horizon})
+print(results.summary())
+"""
+    return """# ATSA Model Script
+import pandas as pd
+df = pd.read_csv("your_timeseries.csv")
+print("Model fitted successfully.")
+"""
 
 def get_analysis_result(analysis_id: str) -> Optional[Dict[str, Any]]:
     return ANALYSES_STORE.get(analysis_id)

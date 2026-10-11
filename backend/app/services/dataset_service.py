@@ -126,5 +126,23 @@ def upload_dataset(filename: str, content: bytes) -> Dict[str, Any]:
     
     return register_dataset(dataset_id, filename, df, time_col, target_col, f"Uploaded dataset: {filename}")
 
+def fetch_public_ticker_data(ticker: str, period: str = "1y", interval: str = "1d") -> Dict[str, Any]:
+    import yfinance as yf
+    tk = yf.Ticker(ticker.strip().upper())
+    hist = tk.history(period=period, interval=interval)
+    if hist.empty:
+        raise ValueError(f"No market data found for ticker '{ticker}' over period '{period}'.")
+        
+    hist = hist.reset_index()
+    time_col = "Date" if "Date" in hist.columns else "Datetime" if "Datetime" in hist.columns else hist.columns[0]
+    hist[time_col] = pd.to_datetime(hist[time_col]).dt.strftime("%Y-%m-%d")
+    
+    target_col = "Close"
+    dataset_id = f"market-{ticker.lower()}-{period}"
+    name = f"{ticker.upper()} Market History ({period})"
+    desc = f"Direct Yahoo Finance market feed for {ticker.upper()} ({period}, interval: {interval})"
+    
+    return register_dataset(dataset_id, name, hist, time_col, target_col, desc)
+
 # Initialize synthetic datasets on module load
 generate_synthetic_datasets()

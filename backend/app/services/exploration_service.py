@@ -88,17 +88,24 @@ def compute_decomposition(dataset_id: str, target_col: str, model_type: str = "a
     if len(s) < 2 * period:
         raise ValueError(f"Decomposition requires at least 2 complete cycles (2 * {period} = {2 * period} observations). Dataset has {len(s)}.")
         
-    if model_type == "multiplicative" and (s <= 0).any():
-        raise ValueError("Multiplicative decomposition requires all observed values to be strictly positive (> 0).")
-        
-    decomp = seasonal_decompose(s.values, model=model_type, period=period, extrapolate_trend='freq')
+    if model_type == "stl":
+        from statsmodels.tsa.seasonal import STL
+        stl_res = STL(s.values, period=period, robust=True).fit()
+        trend_vals = stl_res.trend.tolist()
+        seasonal_vals = stl_res.seasonal.tolist()
+        resid_vals = stl_res.resid.tolist()
+    else:
+        decomp = seasonal_decompose(s.values, model=model_type, period=period, extrapolate_trend='freq')
+        trend_vals = decomp.trend.tolist()
+        seasonal_vals = decomp.seasonal.tolist()
+        resid_vals = decomp.resid.tolist()
     
     return clean_for_json({
         "timestamps": df[time_col].astype(str).tolist(),
         "observed": s.tolist(),
-        "trend": decomp.trend.tolist(),
-        "seasonal": decomp.seasonal.tolist(),
-        "residual": decomp.resid.tolist(),
+        "trend": trend_vals,
+        "seasonal": seasonal_vals,
+        "residual": resid_vals,
         "period": period,
         "model_type": model_type
     })

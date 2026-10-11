@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import {
   Play, RotateCcw, Download, CheckCircle, AlertTriangle,
-  Info, Cpu, Layers, Activity
+  Info, Cpu, Layers, Activity, Sparkles, Code2, Copy
 } from 'lucide-react';
 
 interface ModelConfig {
@@ -203,14 +203,39 @@ export const ModelWorkspacePage: React.FC = () => {
   const [fitResult, setFitResult] = useState<ModelFitResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'forecast' | 'diagnostics' | 'parameters' | 'metrics'>('forecast');
+  const [activeTab, setActiveTab] = useState<'forecast' | 'diagnostics' | 'parameters' | 'metrics' | 'code'>('forecast');
+  
+  // Auto-ARIMA search state
+  const [autoSearching, setAutoSearching] = useState(false);
+  const [autoArimaResults, setAutoArimaResults] = useState<{
+    best_p: number;
+    best_d: number;
+    best_q: number;
+    best_aic: number;
+    top_candidates: { p: number; d: number; q: number; aic: number; bic: number }[];
+  } | null>(null);
 
   // Sync default parameters when switching models
   React.useEffect(() => {
     setParameters(config.defaultParams);
     setFitResult(null);
     setErrorMsg(null);
+    setAutoArimaResults(null);
   }, [modelType]);
+
+  const handleAutoArimaSearch = async () => {
+    if (!selectedDataset || !selectedTarget) return;
+    setAutoSearching(true);
+    try {
+      const res = await apiService.getAutoArima(selectedDataset.id, selectedTarget);
+      setAutoArimaResults(res);
+      setParameters({ ...parameters, p: res.best_p, d: res.best_d, q: res.best_q });
+    } catch (err: any) {
+      alert(err.response?.data?.detail || 'Auto-search failed');
+    } finally {
+      setAutoSearching(false);
+    }
+  };
 
   const handleFit = async () => {
     if (!selectedDataset || !selectedTarget) return;
@@ -301,6 +326,17 @@ export const ModelWorkspacePage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3">
+            {(modelType === 'arima' || modelType === 'arma') && (
+              <button
+                onClick={handleAutoArimaSearch}
+                disabled={autoSearching}
+                className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-50"
+                title="Automated grid search minimizing AIC"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                {autoSearching ? 'Searching Optimal Order...' : 'Auto-Search (p, d, q)'}
+              </button>
+            )}
             <button
               onClick={() => setParameters(config.defaultParams)}
               className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5"
@@ -407,7 +443,8 @@ export const ModelWorkspacePage: React.FC = () => {
               { id: 'forecast', label: '1. Forecast & Fitted Overlay' },
               { id: 'diagnostics', label: '2. Residual Diagnostics' },
               { id: 'parameters', label: '3. Estimated Parameters' },
-              { id: 'metrics', label: '4. Evaluation Metrics' }
+              { id: 'metrics', label: '4. Evaluation Metrics' },
+              { id: 'code', label: '5. Python Reproducibility Script' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -582,6 +619,39 @@ export const ModelWorkspacePage: React.FC = () => {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 5: Python Reproducibility Script */}
+          {activeTab === 'code' && (
+            <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-base font-semibold text-white flex items-center gap-2">
+                    <Code2 className="w-5 h-5 text-emerald-400" />
+                    Executable Python Replication Code
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Standalone Python snippet using statsmodels and pandas reproducing this exact statistical model fit.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (fitResult.python_code) {
+                      navigator.clipboard.writeText(fitResult.python_code);
+                      alert('Python code copied to clipboard!');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy Code
+                </button>
+              </div>
+
+              <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-300 overflow-x-auto leading-relaxed">
+                {fitResult.python_code || '# Code unavailable for this model.'}
+              </pre>
             </div>
           )}
         </div>

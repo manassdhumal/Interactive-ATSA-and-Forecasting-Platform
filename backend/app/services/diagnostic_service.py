@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy import stats
-from statsmodels.tsa.stattools import adfuller, acf, pacf
+from statsmodels.tsa.stattools import adfuller, kpss, acf, pacf
 from statsmodels.stats.diagnostic import acorr_ljungbox
 from typing import Dict, Any, List, Optional
 from app.services.dataset_service import get_dataset
@@ -40,6 +40,36 @@ def compute_adf_test(dataset_id: str, target_col: str, regression: str = "c") ->
         "is_stationary": is_stationary_5pct,
         "interpretation": interpretation,
         "null_hypothesis": "The time series possesses a unit root (is non-stationary)."
+    })
+
+def compute_kpss_test(dataset_id: str, target_col: str, regression: str = "c") -> Dict[str, Any]:
+    ds = get_dataset(dataset_id)
+    if not ds:
+        raise ValueError(f"Dataset '{dataset_id}' not found.")
+    df = ds["df"]
+    s = pd.to_numeric(df[target_col], errors='coerce').dropna().values
+    
+    if len(s) < 15:
+        raise ValueError("KPSS test requires at least 15 valid observations.")
+        
+    stat, p_val, lags, crit_vals = kpss(s, regression=regression, nlags="auto")
+    crit_dict = {str(k): float(v) for k, v in crit_vals.items()}
+    
+    is_stationary_5pct = bool(p_val >= 0.05)
+    interpretation = (
+        "Fail to reject null hypothesis at 5% significance level. The series is consistent with stationarity."
+        if is_stationary_5pct else
+        "Reject null hypothesis at 5% significance level. Evidence suggests non-stationarity."
+    )
+    
+    return clean_for_json({
+        "test_statistic": float(stat),
+        "p_value": float(p_val),
+        "lags_used": int(lags),
+        "critical_values": crit_dict,
+        "is_stationary": is_stationary_5pct,
+        "interpretation": interpretation,
+        "null_hypothesis": "The series is level or trend stationary."
     })
 
 def compute_acf_pacf(dataset_id: str, target_col: str, nlags: int = 30) -> Dict[str, Any]:

@@ -11,6 +11,7 @@ import { Activity, ShieldCheck, AlertTriangle } from 'lucide-react';
 export const StatisticalTestsPage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
   const [adfResult, setAdfResult] = useState<ADFResult | null>(null);
+  const [kpssResult, setKpssResult] = useState<ADFResult | null>(null);
   const [acfPacfResult, setAcfPacfResult] = useState<ACFPACFResult | null>(null);
   const [maxLags, setMaxLags] = useState(24);
   const [regressionType, setRegressionType] = useState('c');
@@ -22,10 +23,12 @@ export const StatisticalTestsPage: React.FC = () => {
 
     Promise.all([
       apiService.getAdf(selectedDataset.id, selectedTarget, regressionType),
+      apiService.getKpss(selectedDataset.id, selectedTarget, regressionType).catch(() => null),
       apiService.getAcfPacf(selectedDataset.id, selectedTarget, maxLags)
     ])
-      .then(([adfRes, apRes]) => {
+      .then(([adfRes, kpssRes, apRes]) => {
         setAdfResult(adfRes);
+        setKpssResult(kpssRes);
         setAcfPacfResult(apRes);
       })
       .catch(console.error)
@@ -130,6 +133,72 @@ export const StatisticalTestsPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* KPSS Stationarity Test Results Panel */}
+      {kpssResult && (
+        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
+          <div className="mb-4">
+            <h2 className="text-base font-semibold text-white flex items-center gap-2">
+              <Activity className="w-4 h-4 text-cyan-400" />
+              Kwiatkowski–Phillips–Schmidt–Shin (KPSS) Test
+            </h2>
+            <p className="text-xs text-slate-400">
+              Null hypothesis (H₀): The series is level/trend stationary. (Opposite orientation of ADF)
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
+              <span className="text-xs text-slate-400">Test Statistic (LM)</span>
+              <div className="text-xl font-bold text-white font-mono mt-1">
+                {kpssResult.test_statistic.toFixed(4)}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1 font-mono">
+                Lags used: {kpssResult.lags_used}
+              </div>
+            </div>
+
+            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
+              <span className="text-xs text-slate-400">p-value</span>
+              <div className={`text-xl font-bold font-mono mt-1 ${kpssResult.p_value >= 0.05 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                {kpssResult.p_value.toFixed(4)}
+              </div>
+              <div className="text-[11px] text-slate-400 mt-1">
+                Threshold: α = 0.05
+              </div>
+            </div>
+
+            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
+              <span className="text-xs text-slate-400">Critical Values</span>
+              <div className="text-xs font-mono text-slate-300 mt-1 space-y-0.5">
+                <div>1%: {kpssResult.critical_values['1%']?.toFixed(3)}</div>
+                <div>5%: {kpssResult.critical_values['5%']?.toFixed(3)}</div>
+                <div>10%: {kpssResult.critical_values['10%']?.toFixed(3)}</div>
+              </div>
+            </div>
+
+            <div className={`p-4 rounded-lg border flex flex-col justify-between ${
+              kpssResult.is_stationary
+                ? 'bg-emerald-950/20 border-emerald-500/40'
+                : 'bg-amber-950/20 border-amber-500/40'
+            }`}>
+              <div className="flex items-center gap-2">
+                {kpssResult.is_stationary ? (
+                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                ) : (
+                  <AlertTriangle className="w-5 h-5 text-amber-400" />
+                )}
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  {kpssResult.is_stationary ? 'Stationary' : 'Non-Stationary'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 mt-2 leading-relaxed">
+                {kpssResult.interpretation}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ACF and PACF Side-by-Side Correlograms */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
