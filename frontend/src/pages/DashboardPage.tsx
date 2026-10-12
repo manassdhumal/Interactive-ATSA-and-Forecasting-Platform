@@ -11,6 +11,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Area, AreaChart
 } from 'recharts';
+import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const DashboardPage: React.FC = () => {
   const { selectedDataset, selectedTarget, datasets } = useApp();
@@ -204,6 +205,38 @@ export const DashboardPage: React.FC = () => {
             </ResponsiveContainer>
           )}
         </div>
+
+        <ChartExplanation
+          title="Understanding the Series Trajectory"
+          summary="This chart plots chronological observations against smoothed and secular components to help you identify whether the series has long-run trend, periodic cycles, or sudden structural breaks."
+          items={[
+            {
+              badge: "Blue Area",
+              badgeColor: "blue",
+              label: "Actual Series (Y_t)",
+              text: "The observed empirical values recorded at each timestamp. Rapid zigzag spikes represent high-frequency noise or short-term volatility."
+            },
+            {
+              badge: "Amber Line",
+              badgeColor: "amber",
+              label: "7-Period Moving Average",
+              text: "A rolling mean filter that dampens short-term noise to highlight intermediate cyclical momentum and directional swings."
+            },
+            {
+              badge: "Green Dashed",
+              badgeColor: "emerald",
+              label: "Linear Trend (OLS)",
+              text: "Global linear regression (Y_t = β₀ + β₁·t). A steep upward/downward slope indicates deterministic non-stationarity in mean."
+            },
+            {
+              badge: "Divergence",
+              badgeColor: "cyan",
+              label: "Mean Drift",
+              text: "When actual points consistently stray far from horizontal stability, difference transformations (d ≥ 1) or seasonal adjustment may be necessary."
+            }
+          ]}
+          takeaway="If the actual values drift steadily away from a flat horizontal mean line, your series is non-stationary. Explore stationarity tests (ADF/KPSS) and consider differencing before fitting ARMA models."
+        />
       </div>
 
       {/* Model Quick Access Cards */}

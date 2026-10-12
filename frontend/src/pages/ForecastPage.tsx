@@ -7,6 +7,7 @@ import {
   CartesianGrid, AreaChart, Area
 } from 'recharts';
 import { Compass, Download, Play, Calendar, Layers } from 'lucide-react';
+import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const ForecastPage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
@@ -192,6 +193,39 @@ export const ForecastPage: React.FC = () => {
                 </AreaChart>
               </ResponsiveContainer>
             </div>
+
+            <ChartExplanation
+              title="Understanding the Multi-Step Forecast & Confidence Cone"
+              summary="This graph visualizes the projected chronological trajectory into unseen future periods, paired with analytical probability confidence boundaries."
+              formula={`Ŷ_{T+h} ± z_{α/2} · σ_h  (${Math.round(confidenceLevel * 100)}% Confidence Interval)`}
+              items={[
+                {
+                  badge: "Blue Curve",
+                  badgeColor: "blue",
+                  label: "Historical Actuals",
+                  text: "Observed ground truth values up to the cutoff origin T, capturing real historical trends and seasonality."
+                },
+                {
+                  badge: "Rose Red Curve",
+                  badgeColor: "rose",
+                  label: "Future Forecast",
+                  text: `Expected conditional mean values for the next ${horizon} time periods (T+1 to T+${horizon}).`
+                },
+                {
+                  badge: "Light Cyan Funnel",
+                  badgeColor: "cyan",
+                  label: "Prediction Cone",
+                  text: `The ${Math.round(confidenceLevel * 100)}% probability band where the true future path is statistically expected to land.`
+                },
+                {
+                  badge: "Expanding Width",
+                  badgeColor: "amber",
+                  label: "Compounding Uncertainty",
+                  text: "Notice that the confidence envelope fans out wider as you look further ahead, mathematically reflecting error compounding over long horizons."
+                }
+              ]}
+              takeaway="The red line represents the most likely central path, but real outcomes can fall anywhere within the shaded cone. Always account for the uncertainty band when making operational decisions."
+            />
           </div>
 
           {/* Forecast Predictions Table */}

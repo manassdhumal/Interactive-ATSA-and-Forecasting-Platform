@@ -7,6 +7,7 @@ import {
   CartesianGrid, ReferenceLine
 } from 'recharts';
 import { Activity, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const StatisticalTestsPage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
@@ -228,33 +229,141 @@ export const StatisticalTestsPage: React.FC = () => {
               </BarChart>
             </ResponsiveContainer>
           </div>
+
+          <ChartExplanation
+            title="How to Read the ACF Correlogram"
+            summary="The ACF measures gross linear correlation between observations separated by lag k, capturing both direct dependence and indirect effects cascading through intermediate time periods."
+            formula="ρ_k = Cov(Y_t, Y_{t-k}) / Var(Y_t)"
+            items={[
+              {
+                badge: "Blue Vertical Bars",
+                badgeColor: "blue",
+                label: "Autocorrelation (ρ_k)",
+                text: "The height of each bar represents correlation strength from -1.0 to +1.0 for each time displacement k."
+              },
+              {
+                badge: "Dashed Cyan Lines",
+                badgeColor: "cyan",
+                label: "95% Bartlett CI (±1.96/√N)",
+                text: "Confidence boundaries for white noise. Bars that stay inside the dashed lines are statistically negligible (random noise)."
+              },
+              {
+                badge: "Slow Gradual Decay",
+                badgeColor: "amber",
+                label: "Non-Stationary Unit Root",
+                text: "If positive bars decay very slowly across 15+ lags, the series has persistence/trend and requires first-differencing (d=1)."
+              },
+              {
+                badge: "Sharp Cutoff at Lag q",
+                badgeColor: "emerald",
+                label: "Moving Average MA(q)",
+                text: "If bars abruptly plunge inside the bounds after lag q, it suggests an MA(q) process order."
+              }
+            ]}
+            takeaway="Use the ACF cutoff to select the Moving Average order q. If ACF decays slowly without cutting off, difference the series (d ≥ 1)."
+          />
         </div>
 
         {/* PACF */}
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-base font-semibold text-white">Partial Autocorrelation Function (PACF)</h2>
-              <p className="text-xs text-slate-400">Direct correlation between Y_t and Y_{'t-k'}, controlling for intermediate lags</p>
+        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h2 className="text-base font-semibold text-white">Partial Autocorrelation Function (PACF)</h2>
+                <p className="text-xs text-slate-400">Direct correlation between Y_t and Y_{'t-k'}, controlling for intermediate lags</p>
+              </div>
+              <span className="text-[11px] font-mono text-slate-400">
+                CI ±{(acfPacfResult?.ci_bound || 0.196).toFixed(3)}
+              </span>
             </div>
-            <span className="text-[11px] font-mono text-slate-400">
-              CI ±{(acfPacfResult?.ci_bound || 0.196).toFixed(3)}
-            </span>
+
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={pacfPoints}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis dataKey="lag" stroke="#64748b" tick={{ fontSize: 10 }} />
+                  <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[-1, 1]} />
+                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
+                  <ReferenceLine y={acfPacfResult?.ci_bound || 0.196} stroke="#38bdf8" strokeDasharray="3 3" />
+                  <ReferenceLine y={-(acfPacfResult?.ci_bound || 0.196)} stroke="#38bdf8" strokeDasharray="3 3" />
+                  <ReferenceLine y={0} stroke="#475569" />
+                  <Bar dataKey="val" fill="#a855f7" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pacfPoints}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="lag" stroke="#64748b" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[-1, 1]} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
-                <ReferenceLine y={acfPacfResult?.ci_bound || 0.196} stroke="#38bdf8" strokeDasharray="3 3" />
-                <ReferenceLine y={-(acfPacfResult?.ci_bound || 0.196)} stroke="#38bdf8" strokeDasharray="3 3" />
-                <ReferenceLine y={0} stroke="#475569" />
-                <Bar dataKey="val" fill="#a855f7" />
-              </BarChart>
-            </ResponsiveContainer>
+          <ChartExplanation
+            title="How to Read the PACF Correlogram"
+            summary="The PACF isolates the pure, direct relationship between Y_t and Y_{t-k} by mathematically partialling out (controlling for) all intermediate intervening observations Y_{t-1}, ..., Y_{t-k+1}."
+            formula="ϕ_{kk} = Corr(Y_t, Y_{t-k} | Y_{t-1}, ..., Y_{t-k+1})"
+            items={[
+              {
+                badge: "Purple Vertical Bars",
+                badgeColor: "purple",
+                label: "Partial Autocorrelation",
+                text: "The direct linear contribution of lag k alone after removing intermediary collinearity."
+              },
+              {
+                badge: "Dashed Cyan Lines",
+                badgeColor: "cyan",
+                label: "Significance Threshold",
+                text: "Any purple bar extending beyond the dashed lines is statistically significant at α = 0.05."
+              },
+              {
+                badge: "Sharp Cutoff at Lag p",
+                badgeColor: "emerald",
+                label: "Autoregressive AR(p)",
+                text: "If bars 1 to p breach the confidence bound and then plunge to zero at lag p+1, the series is an AR(p) process."
+              },
+              {
+                badge: "Damped Sine Waves",
+                badgeColor: "slate",
+                label: "Moving Average Signature",
+                text: "Oscillatory decaying bars in PACF accompanied by a sharp cutoff in ACF indicate an MA process."
+              }
+            ]}
+            takeaway="Count the number of statistically significant purple bars before the cutoff to determine the autoregressive order p in AR(p) or ARIMA(p, d, q)."
+          />
+        </div>
+      </div>
+
+      {/* Box-Jenkins Model Identification Summary Card */}
+      <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
+        <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
+          <Activity className="w-4 h-4 text-cyan-400" />
+          Box-Jenkins Model Identification Cheatsheet
+        </h3>
+        <p className="text-xs text-slate-400 mb-4">
+          How to combine ACF and PACF correlograms to identify the candidate time series model architecture:
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+          <div className="bg-slate-900/60 p-3.5 rounded-xl border border-blue-500/20">
+            <div className="font-bold text-blue-400 font-mono mb-1">AR(p) — Autoregressive</div>
+            <ul className="text-slate-300 space-y-1 text-[11px] list-disc list-inside">
+              <li><strong className="text-white">ACF:</strong> Tapers off exponentially or as damped sine wave</li>
+              <li><strong className="text-white">PACF:</strong> Cuts off sharply after lag <code className="text-blue-300">p</code></li>
+              <li><span className="text-slate-400">Action: Set ARIMA order (p, 0, 0)</span></li>
+            </ul>
+          </div>
+
+          <div className="bg-slate-900/60 p-3.5 rounded-xl border border-purple-500/20">
+            <div className="font-bold text-purple-400 font-mono mb-1">MA(q) — Moving Average</div>
+            <ul className="text-slate-300 space-y-1 text-[11px] list-disc list-inside">
+              <li><strong className="text-white">ACF:</strong> Cuts off sharply after lag <code className="text-purple-300">q</code></li>
+              <li><strong className="text-white">PACF:</strong> Tapers off exponentially or oscillates</li>
+              <li><span className="text-slate-400">Action: Set ARIMA order (0, 0, q)</span></li>
+            </ul>
+          </div>
+
+          <div className="bg-slate-900/60 p-3.5 rounded-xl border border-emerald-500/20">
+            <div className="font-bold text-emerald-400 font-mono mb-1">ARMA(p, q) / ARIMA(p, d, q)</div>
+            <ul className="text-slate-300 space-y-1 text-[11px] list-disc list-inside">
+              <li><strong className="text-white">ACF:</strong> Tapers off after lag (q - p)</li>
+              <li><strong className="text-white">PACF:</strong> Tapers off after lag (p - q)</li>
+              <li><span className="text-slate-400">Action: Use AIC/BIC search or compare models</span></li>
+            </ul>
           </div>
         </div>
       </div>

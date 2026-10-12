@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { apiService } from '../services/api';
 import { ModelFitResult } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, AreaChart, Area, BarChart, Bar, ScatterChart, Scatter
+  CartesianGrid, AreaChart, Area, BarChart, Bar
 } from 'recharts';
 import {
-  Play, RotateCcw, Download, CheckCircle, AlertTriangle,
-  Info, Cpu, Layers, Activity, Sparkles, Code2, Copy
+  Play, RotateCcw, Download, AlertTriangle,
+  Info, Sparkles, Code2, Copy
 } from 'lucide-react';
+import { ChartExplanation } from '../components/common/ChartExplanation';
 
 interface ModelConfig {
   title: string;
@@ -506,71 +507,138 @@ export const ModelWorkspacePage: React.FC = () => {
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
+
+              <ChartExplanation
+                title="How to Read the Model Fit & Forecast Graph"
+                summary="This visualization overlays the model's in-sample fitted trajectory against the empirical ground truth, followed by forward out-of-sample projections and confidence uncertainty intervals."
+                items={[
+                  {
+                    badge: "Blue Curve",
+                    badgeColor: "blue",
+                    label: "Actual History (Y_t)",
+                    text: "Empirical historical observations used for statistical parameter estimation and training."
+                  },
+                  {
+                    badge: "Green Curve",
+                    badgeColor: "emerald",
+                    label: "Fitted Values (Ŷ_t)",
+                    text: "The model's in-sample one-step-ahead expectations. Tight alignment with the blue curve indicates strong explanatory power."
+                  },
+                  {
+                    badge: "Rose Red Curve",
+                    badgeColor: "rose",
+                    label: "Forecast (Ŷ_{T+h})",
+                    text: "Multi-step forward chronological projections computed using estimated model coefficients and state equations."
+                  },
+                  {
+                    badge: "Light Cyan Band",
+                    badgeColor: "cyan",
+                    label: "Prediction Intervals (±1.96σ)",
+                    text: "Probabilistic uncertainty funnel (95% confidence). It naturally expands wider over longer horizons as cumulative forecast variance compounds."
+                  }
+                ]}
+                takeaway="A well-specified model tracks turning points in actual data without excessive lag, while maintaining realistic expanding prediction intervals that encompass likely future outcomes."
+              />
             </div>
           )}
 
           {/* TAB 2: Diagnostics */}
           {activeTab === 'diagnostics' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Residual Time Plot */}
-              <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-                <h3 className="text-sm font-semibold text-white mb-1">Residuals Over Time e_t</h3>
-                <p className="text-xs text-slate-400 mb-3">Checking for mean zero and homoscedasticity</p>
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={residualChartData()}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                      <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
-                      <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                      <Line type="monotone" dataKey="residual" stroke="#f43f5e" dot={false} strokeWidth={1.5} />
-                    </LineChart>
-                  </ResponsiveContainer>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Residual Time Plot */}
+                <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
+                  <h3 className="text-sm font-semibold text-white mb-1">Residuals Over Time e_t</h3>
+                  <p className="text-xs text-slate-400 mb-3">Checking for mean zero and homoscedasticity</p>
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={residualChartData()}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                        <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                        <Line type="monotone" dataKey="residual" stroke="#f43f5e" dot={false} strokeWidth={1.5} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
 
-              {/* Ljung-Box Test & Distribution */}
-              <div className="bg-[#101728] border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
-                <div>
-                  <h3 className="text-sm font-semibold text-white mb-1">Ljung-Box White Noise Test</h3>
-                  <p className="text-xs text-slate-400 mb-3">Hypothesis test for independence of residuals</p>
-                  {fitResult.diagnostics.ljung_box && (
-                    <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 space-y-2 text-xs font-mono">
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">Statistic (Q):</span>
-                        <span className="text-white font-bold">{fitResult.diagnostics.ljung_box.statistic.toFixed(4)}</span>
+                {/* Ljung-Box Test & Distribution */}
+                <div className="bg-[#101728] border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white mb-1">Ljung-Box White Noise Test</h3>
+                    <p className="text-xs text-slate-400 mb-3">Hypothesis test for independence of residuals</p>
+                    {fitResult.diagnostics.ljung_box && (
+                      <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 space-y-2 text-xs font-mono">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">Statistic (Q):</span>
+                          <span className="text-white font-bold">{fitResult.diagnostics.ljung_box.statistic.toFixed(4)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-400">p-value:</span>
+                          <span className={fitResult.diagnostics.ljung_box.p_value > 0.05 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                            {fitResult.diagnostics.ljung_box.p_value.toFixed(4)}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-300 font-sans mt-2 pt-2 border-t border-slate-800">
+                          {fitResult.diagnostics.ljung_box.interpretation}
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-400">p-value:</span>
-                        <span className={fitResult.diagnostics.ljung_box.p_value > 0.05 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
-                          {fitResult.diagnostics.ljung_box.p_value.toFixed(4)}
-                        </span>
-                      </div>
-                      <div className="text-[11px] text-slate-300 font-sans mt-2 pt-2 border-t border-slate-800">
-                        {fitResult.diagnostics.ljung_box.interpretation}
+                    )}
+                  </div>
+
+                  {fitResult.diagnostics.histogram && (
+                    <div className="mt-4">
+                      <h4 className="text-xs font-semibold text-slate-300 mb-2">Residual Histogram</h4>
+                      <div className="h-32">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={fitResult.diagnostics.histogram.bins.map((b, i) => ({
+                            bin: b.toFixed(1),
+                            count: fitResult.diagnostics.histogram?.counts[i]
+                          }))}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                            <XAxis dataKey="bin" stroke="#64748b" tick={{ fontSize: 9 }} />
+                            <YAxis stroke="#64748b" tick={{ fontSize: 9 }} />
+                            <Bar dataKey="count" fill="#6366f1" />
+                          </BarChart>
+                        </ResponsiveContainer>
                       </div>
                     </div>
                   )}
                 </div>
-
-                {fitResult.diagnostics.histogram && (
-                  <div className="mt-4">
-                    <h4 className="text-xs font-semibold text-slate-300 mb-2">Residual Histogram</h4>
-                    <div className="h-32">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={fitResult.diagnostics.histogram.bins.map((b, i) => ({
-                          bin: b.toFixed(1),
-                          count: fitResult.diagnostics.histogram?.counts[i]
-                        }))}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                          <XAxis dataKey="bin" stroke="#64748b" tick={{ fontSize: 9 }} />
-                          <YAxis stroke="#64748b" tick={{ fontSize: 9 }} />
-                          <Bar dataKey="count" fill="#6366f1" />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  </div>
-                )}
               </div>
+
+              <ChartExplanation
+                title="Interpreting Residual Diagnostics & White Noise"
+                summary="Residuals (e_t = Y_t - Ŷ_t) measure whatever remains unexplained by the model. Diagnostic adequacy requires errors to be strictly independent white noise."
+                formula="e_t ~ i.i.d. N(0, σ²)"
+                items={[
+                  {
+                    badge: "Zero Mean Oscillation",
+                    badgeColor: "rose",
+                    label: "Residual Line (e_t)",
+                    text: "Errors should fluctuate symmetrically around zero (0.0). A sloped residual line indicates missed trend; sinusoidal waves indicate missed seasonality."
+                  },
+                  {
+                    badge: "Constant Variance",
+                    badgeColor: "slate",
+                    label: "Homoscedasticity",
+                    text: "Residual scatter thickness should remain stable across time rather than expanding (heteroscedasticity)."
+                  },
+                  {
+                    badge: "Ljung-Box (p > 0.05)",
+                    badgeColor: "emerald",
+                    label: "White Noise Test",
+                    text: "Null hypothesis H₀: residuals are uncorrelated. If p > 0.05, you cannot reject H₀ (pass). If p < 0.05, serial correlation remains in the errors."
+                  },
+                  {
+                    badge: "Bell-Shaped Curve",
+                    badgeColor: "purple",
+                    label: "Histogram Normality",
+                    text: "The histogram should resemble a symmetric Gaussian bell curve centered at zero without severe skewness or heavy fat tails."
+                  }
+                ]}
+                takeaway="A passing Ljung-Box test (p > 0.05) and a random, pattern-free residual plot confirm that your model has captured all systematic predictability from the series."
+              />
             </div>
           )}
 

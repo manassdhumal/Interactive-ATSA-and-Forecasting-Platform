@@ -7,6 +7,7 @@ import {
   CartesianGrid, ScatterChart, Scatter, Brush
 } from 'recharts';
 import { Layers, Activity, Sliders, TrendingUp } from 'lucide-react';
+import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const ExplorePage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
@@ -127,6 +128,38 @@ export const ExplorePage: React.FC = () => {
             </LineChart>
           </ResponsiveContainer>
         </div>
+
+        <ChartExplanation
+          title="Interpreting Rolling Statistics & Volatility"
+          summary="Rolling statistics evaluate local stationarity. By computing moving moments inside a sliding window, you can determine whether the level (mean) and variance (volatility) remain stable across time."
+          items={[
+            {
+              badge: "Blue Line",
+              badgeColor: "blue",
+              label: "Actual Series",
+              text: "Raw chronological values. Sharp fluctuations highlight high-frequency noise or rapid regime shifts."
+            },
+            {
+              badge: "Amber Line",
+              badgeColor: "amber",
+              label: "Rolling Mean (μ_t)",
+              text: "Sliding window central tendency. A horizontal rolling mean indicates mean-stationarity, whereas an upward or downward slant indicates a drift/trend."
+            },
+            {
+              badge: "Purple Dashed",
+              badgeColor: "purple",
+              label: "Rolling Std Dev (σ_t)",
+              text: "Local dispersion measurement. If this curve flares up during certain periods, the series has heteroscedasticity (volatility clustering)."
+            },
+            {
+              badge: "Interactive Brush",
+              badgeColor: "cyan",
+              label: "Timeline Slider",
+              text: "Click and drag the bottom navigator handles to zoom in on specific sub-periods and inspect local cyclical patterns."
+            }
+          ]}
+          takeaway="Stationary time series maintain a flat horizontal rolling mean and a stable rolling standard deviation. Flaring purple lines or sloped amber lines suggest transformations (log or differencing) are required."
+        />
       </div>
 
       {/* 4-Panel Time Series Decomposition */}
@@ -223,6 +256,39 @@ export const ExplorePage: React.FC = () => {
             Series requires at least 2 full periods (2 × {decompPeriod} = {2 * decompPeriod} observations) for decomposition.
           </div>
         )}
+
+        <ChartExplanation
+          title="Understanding Time Series Decomposition"
+          summary="Decomposition isolates latent structural components to reveal how much of the series' movement is driven by secular growth, predictable recurring cycles, or random shocks."
+          formula={decompModel === 'additive' ? "Observed_t = Trend_t + Seasonal_t + Residual_t" : decompModel === 'multiplicative' ? "Observed_t = Trend_t × Seasonal_t × Residual_t" : "Observed_t = Trend(LOESS)_t + Seasonal(LOESS)_t + Residual_t"}
+          items={[
+            {
+              badge: "1. Observed",
+              badgeColor: "blue",
+              label: "Composite Series",
+              text: "The raw empirical time series containing all combined trend, seasonal, and stochastic forces."
+            },
+            {
+              badge: "2. Trend",
+              badgeColor: "emerald",
+              label: "Secular Direction",
+              text: "The smooth long-term trajectory isolated by filtering out seasonal cycles. Shows underlying expansion or contraction."
+            },
+            {
+              badge: "3. Seasonal",
+              badgeColor: "amber",
+              label: "Periodic Recurrence",
+              text: `Oscillations that repeat exactly every ${decompPeriod} timestamps. If amplitude grows over time, Multiplicative model is preferred over Additive.`
+            },
+            {
+              badge: "4. Residual",
+              badgeColor: "rose",
+              label: "Stochastic Noise (e_t)",
+              text: "The irregular noise left after subtracting trend and seasonal components. A good decomposition leaves purely random white noise."
+            }
+          ]}
+          takeaway="If the Residual panel displays visible sinusoidal waves or a sloped drift, the chosen seasonal period or model type is misspecified. Residuals should look like unstructured white noise."
+        />
       </div>
 
       {/* Lag Plots */}
@@ -248,6 +314,38 @@ export const ExplorePage: React.FC = () => {
               </div>
             ))}
           </div>
+
+          <ChartExplanation
+            title="How to Read Lag Phase Scatter Plots"
+            summary="Lag plots graph each observation Y_t against an earlier observation Y_{t-k} to visually diagnose serial dependence, autocorrelation strength, and potential non-linearities."
+            items={[
+              {
+                badge: "Diagonal Ellipse",
+                badgeColor: "cyan",
+                label: "Positive Autocorrelation",
+                text: "Points clustering along a tight 45° upward diagonal indicate strong serial memory: high values today strongly follow high values from k steps ago."
+              },
+              {
+                badge: "Circular Cloud",
+                badgeColor: "slate",
+                label: "Zero Autocorrelation",
+                text: "A random, uniform circular scatter shows that observations k steps apart are mutually uncorrelated (independent innovations)."
+              },
+              {
+                badge: "Ring or Loop",
+                badgeColor: "amber",
+                label: "Seasonal Cycling",
+                text: "An elliptical ring or periodic pattern reveals deterministic seasonal cycles repeating at lag k."
+              },
+              {
+                badge: "Curved Parabola",
+                badgeColor: "rose",
+                label: "Non-Linear Dynamics",
+                text: "Non-linear curves reveal non-linear dependencies or regime shifts that standard linear autoregression cannot capture alone."
+              }
+            ]}
+            takeaway="A tight diagonal cluster at Lag 1 confirms strong short-run persistence, providing visual justification for an Autoregressive AR(1) or ARIMA model."
+          />
         </div>
       )}
     </div>
