@@ -52,14 +52,23 @@ def compare_models(
                 slope, intercept, _, _, _ = stats.linregress(np.arange(len(y_train)), y_train)
                 preds = slope * np.arange(len(y_train), len(y_train) + test_size) + intercept
             elif key == "ses":
-                fit_m = SimpleExpSmoothing(y_train).fit()
+                try:
+                    fit_m = SimpleExpSmoothing(y_train, initialization_method="estimated").fit()
+                except Exception:
+                    fit_m = SimpleExpSmoothing(y_train, initialization_method="heuristic").fit()
                 preds = fit_m.forecast(test_size)
             elif key == "holt":
-                fit_m = Holt(y_train).fit()
+                try:
+                    fit_m = Holt(y_train, initialization_method="estimated").fit()
+                except Exception:
+                    fit_m = Holt(y_train, initialization_method="heuristic").fit()
                 preds = fit_m.forecast(test_size)
             elif key == "holt_winters":
                 p_val = seasonal_period if len(y_train) >= 2 * seasonal_period else 7
-                fit_m = ExponentialSmoothing(y_train, trend="add", seasonal="add", seasonal_periods=p_val).fit()
+                try:
+                    fit_m = ExponentialSmoothing(y_train, trend="add", seasonal="add", seasonal_periods=p_val, initialization_method="estimated").fit()
+                except Exception:
+                    fit_m = ExponentialSmoothing(y_train, trend="add", seasonal="add", seasonal_periods=p_val, initialization_method="heuristic").fit()
                 preds = fit_m.forecast(test_size)
             elif key == "ar":
                 fit_m = ARIMA(y_train, order=(1, 0, 0), trend="c").fit()

@@ -121,7 +121,16 @@ def fit_time_series_model(
     elif model_type == "ses":
         alpha = parameters.get("alpha")
         alpha = float(alpha) if alpha is not None and alpha != "auto" else None
-        fit_res = SimpleExpSmoothing(y).fit(smoothing_level=alpha, optimized=(alpha is None))
+        try:
+            fit_res = SimpleExpSmoothing(y, initialization_method="estimated").fit(
+                smoothing_level=alpha,
+                optimized=(alpha is None)
+            )
+        except Exception:
+            fit_res = SimpleExpSmoothing(y, initialization_method="heuristic").fit(
+                smoothing_level=alpha,
+                optimized=(alpha is None)
+            )
         fitted = fit_res.fittedvalues
         forecast = fit_res.forecast(forecast_horizon)
         residuals = y - fitted
@@ -137,7 +146,18 @@ def fit_time_series_model(
         beta = parameters.get("beta")
         alpha = float(alpha) if alpha is not None and alpha != "auto" else None
         beta = float(beta) if beta is not None and beta != "auto" else None
-        fit_res = Holt(y).fit(smoothing_level=alpha, smoothing_trend=beta, optimized=(alpha is None or beta is None))
+        try:
+            fit_res = Holt(y, initialization_method="estimated").fit(
+                smoothing_level=alpha,
+                smoothing_trend=beta,
+                optimized=(alpha is None or beta is None)
+            )
+        except Exception:
+            fit_res = Holt(y, initialization_method="heuristic").fit(
+                smoothing_level=alpha,
+                smoothing_trend=beta,
+                optimized=(alpha is None or beta is None)
+            )
         fitted = fit_res.fittedvalues
         forecast = fit_res.forecast(forecast_horizon)
         residuals = y - fitted
@@ -157,7 +177,22 @@ def fit_time_series_model(
         period = int(parameters.get("period", 12 if n >= 24 else 7))
         if seasonal == "mul" and (y <= 0).any():
             raise ValueError("Multiplicative seasonality requires all values to be positive (> 0).")
-        fit_res = ExponentialSmoothing(y, trend=trend, seasonal=seasonal, seasonal_periods=period).fit()
+        try:
+            fit_res = ExponentialSmoothing(
+                y,
+                trend=trend,
+                seasonal=seasonal,
+                seasonal_periods=period,
+                initialization_method="estimated"
+            ).fit()
+        except Exception:
+            fit_res = ExponentialSmoothing(
+                y,
+                trend=trend,
+                seasonal=seasonal,
+                seasonal_periods=period,
+                initialization_method="heuristic"
+            ).fit()
         fitted = fit_res.fittedvalues
         forecast = fit_res.forecast(forecast_horizon)
         residuals = y - fitted
@@ -371,10 +406,76 @@ from statsmodels.tsa.holtwinters import ExponentialSmoothing
 df = pd.read_csv("your_timeseries.csv")
 y = df["target_column"].dropna().values
 
-model = ExponentialSmoothing(y, trend='{parameters.get("trend","add")}', seasonal='{parameters.get("seasonal","add")}', seasonal_periods={parameters.get("period",12)})
+model = ExponentialSmoothing(y, trend='{parameters.get("trend","add")}', seasonal='{parameters.get("seasonal","add")}', seasonal_periods={parameters.get("period",12)}, initialization_method="estimated")
 results = model.fit()
 forecast = results.forecast({horizon})
 print(results.summary())
+"""
+    elif model_type == "ses":
+        alpha = parameters.get("alpha")
+        alpha_arg = f"smoothing_level={alpha}" if alpha and alpha != "auto" else ""
+        return f"""# ATSA Reproducibility Script for Simple Exponential Smoothing (SES)
+import pandas as pd
+from statsmodels.tsa.holtwinters import SimpleExpSmoothing
+
+df = pd.read_csv("your_timeseries.csv")
+y = df["target_column"].dropna().values
+
+model = SimpleExpSmoothing(y, initialization_method="estimated")
+results = model.fit({alpha_arg})
+forecast = results.forecast({horizon})
+print("Forecasted values:", forecast)
+print(results.summary())
+"""
+    elif model_type == "holt":
+        alpha = parameters.get("alpha")
+        beta = parameters.get("beta")
+        args = []
+        if alpha and alpha != "auto":
+            args.append(f"smoothing_level={alpha}")
+        if beta and beta != "auto":
+            args.append(f"smoothing_trend={beta}")
+        fit_args = ", ".join(args)
+        return f"""# ATSA Reproducibility Script for Holt's Linear Trend
+import pandas as pd
+from statsmodels.tsa.holtwinters import Holt
+
+df = pd.read_csv("your_timeseries.csv")
+y = df["target_column"].dropna().values
+
+model = Holt(y, initialization_method="estimated")
+results = model.fit({fit_args})
+forecast = results.forecast({horizon})
+print("Forecasted values:", forecast)
+print(results.summary())
+"""
+    elif model_type == "linear_trend":
+        return f"""# ATSA Reproducibility Script for Linear Trend Regression
+import pandas as pd
+import numpy as np
+from scipy import stats
+
+df = pd.read_csv("your_timeseries.csv")
+y = df["target_column"].dropna().values
+x = np.arange(len(y))
+
+slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+future_x = np.arange(len(y), len(y) + {horizon})
+forecast = slope * future_x + intercept
+print(f"Fitted trend: y = {intercept:.4f} + {slope:.4f} * t (R² = {r_value**2:.4f})")
+print("Forecasted values:", forecast)
+"""
+    elif model_type == "naive":
+        return f"""# ATSA Reproducibility Script for Naive Random Walk Baseline
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv("your_timeseries.csv")
+y = df["target_column"].dropna().values
+
+terminal_value = y[-1]
+forecast = np.full({horizon}, terminal_value)
+print(f"Baseline Naive Forecast ({horizon} steps):", forecast)
 """
     return """# ATSA Model Script
 import pandas as pd
