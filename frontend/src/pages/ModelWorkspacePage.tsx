@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
 import { ModelFitResult } from '../types';
 import {
@@ -9,7 +10,7 @@ import {
 } from 'recharts';
 import {
   Play, RotateCcw, Download, AlertTriangle,
-  Info, Sparkles, Code2, Copy
+  Info, Sparkles, Code2, Copy, Check
 } from 'lucide-react';
 import { ChartExplanation } from '../components/common/ChartExplanation';
 
@@ -31,7 +32,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   linear_trend: {
     title: 'Deterministic Linear Trend Regression',
-    math: 'Y_t = β_0 + β_1 \\cdot t + \\epsilon_t',
+    math: 'Y_t = β_0 + β_1 · t + ε_t',
     description: 'Models the time series as a linear function of time index t with standard OLS regression.',
     defaultParams: {},
     paramFields: []
@@ -58,7 +59,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   holt: {
     title: "Holt's Linear Trend Method",
-    math: 'L_t = α Y_t + (1 - α)(L_{t-1} + b_{t-1}), \\quad b_t = β(L_t - L_{t-1}) + (1 - β)b_{t-1}',
+    math: 'L_t = α Y_t + (1 - α)(L_{t-1} + b_{t-1}),  b_t = β(L_t - L_{t-1}) + (1 - β)b_{t-1}',
     description: 'Two-parameter exponential smoothing accommodating level (α) and slope trend (β).',
     defaultParams: { alpha: 'auto', beta: 'auto' },
     paramFields: [
@@ -88,7 +89,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   holt_winters: {
     title: 'Holt-Winters Exponential Smoothing',
-    math: 'Ŷ_{t+h} = (L_t + h b_t) \\cdot S_{t+h-m(k+1)}',
+    math: 'Ŷ_{t+h} = (L_t + h b_t) · S_{t+h-m(k+1)}',
     description: 'Triple exponential smoothing capturing level, trend, and cyclical seasonal patterns.',
     defaultParams: { trend: 'add', seasonal: 'add', period: 12 },
     paramFields: [
@@ -112,7 +113,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   ar: {
     title: 'Autoregressive Model — AR(p)',
-    math: 'Y_t = c + \\sum_{i=1}^p \\phi_i Y_{t-i} + \\epsilon_t',
+    math: 'Y_t = c + ∑ φ_i Y_{t-i} + ε_t',
     description: 'Models current observation as a linear combination of its own previous p lags.',
     defaultParams: { p: 1, trend: 'c' },
     paramFields: [
@@ -130,8 +131,8 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   ma: {
     title: 'Moving Average Model — MA(q)',
-    math: 'Y_t = \\mu + \\epsilon_t + \\sum_{j=1}^q \\theta_j \\epsilon_{t-j}',
-    description: 'Models series based on past white-noise forecast errors (innovations). (Not a moving average filter)',
+    math: 'Y_t = μ + ε_t + ∑ θ_j ε_{t-j}',
+    description: 'Models series based on past white-noise forecast errors (innovations). (Not a rolling average filter)',
     defaultParams: { q: 1, trend: 'c' },
     paramFields: [
       { key: 'q', label: 'Moving Average Order (q)', type: 'number', min: 1, max: 10 },
@@ -148,7 +149,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   arma: {
     title: 'Autoregressive Moving Average — ARMA(p, q)',
-    math: 'Y_t = c + \\sum_{i=1}^p \\phi_i Y_{t-i} + \\epsilon_t + \\sum_{j=1}^q \\theta_j \\epsilon_{t-j}',
+    math: 'Y_t = c + ∑ φ_i Y_{t-i} + ε_t + ∑ θ_j ε_{t-j}',
     description: 'Combined stationary stochastic process for time series satisfying weakly stationary conditions.',
     defaultParams: { p: 1, q: 1, trend: 'c' },
     paramFields: [
@@ -167,7 +168,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   arima: {
     title: 'Autoregressive Integrated Moving Average — ARIMA(p, d, q)',
-    math: '\\Phi(B)(1 - B)^d Y_t = c + \\Theta(B) \\epsilon_t',
+    math: 'Φ(B)(1 - B)^d Y_t = c + Θ(B) ε_t',
     description: 'General classical model for non-stationary series stationarized through order-d differencing.',
     defaultParams: { p: 1, d: 1, q: 1, trend: 'n' },
     paramFields: [
@@ -178,7 +179,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
   },
   sarima: {
     title: 'Seasonal ARIMA — SARIMA(p, d, q)(P, D, Q)[s]',
-    math: '\\Phi_p(B) \\tilde{\\Phi}_P(B^s) (1 - B)^d (1 - B^s)^D Y_t = \\Theta_q(B) \\tilde{\\Theta}_Q(B^s) \\epsilon_t',
+    math: 'Φ_p(B) Φ̃_P(B^s)(1 - B)^d (1 - B^s)^D Y_t = Θ_q(B) Θ̃_Q(B^s) ε_t',
     description: 'Multiplicative seasonal ARIMA capturing both short-run autocorrelation and long-run seasonal recurrence.',
     defaultParams: { p: 1, d: 0, q: 1, P: 1, D: 0, Q: 1, s: 12 },
     paramFields: [
@@ -196,6 +197,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
 export const ModelWorkspacePage: React.FC = () => {
   const { modelType = 'arma' } = useParams<{ modelType: string }>();
   const { selectedDataset, selectedTarget } = useApp();
+  const { isDark, chartTheme } = useTheme();
   const config = MODEL_CONFIGS[modelType] || MODEL_CONFIGS['arma'];
 
   const [parameters, setParameters] = useState<Record<string, any>>(config.defaultParams);
@@ -205,23 +207,16 @@ export const ModelWorkspacePage: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'forecast' | 'diagnostics' | 'parameters' | 'metrics' | 'code'>('forecast');
+  const [copiedCode, setCopiedCode] = useState(false);
   
   // Auto-ARIMA search state
   const [autoSearching, setAutoSearching] = useState(false);
-  const [autoArimaResults, setAutoArimaResults] = useState<{
-    best_p: number;
-    best_d: number;
-    best_q: number;
-    best_aic: number;
-    top_candidates: { p: number; d: number; q: number; aic: number; bic: number }[];
-  } | null>(null);
 
   // Sync default parameters when switching models
   React.useEffect(() => {
     setParameters(config.defaultParams);
     setFitResult(null);
     setErrorMsg(null);
-    setAutoArimaResults(null);
   }, [modelType]);
 
   const handleAutoArimaSearch = async () => {
@@ -229,7 +224,6 @@ export const ModelWorkspacePage: React.FC = () => {
     setAutoSearching(true);
     try {
       const res = await apiService.getAutoArima(selectedDataset.id, selectedTarget);
-      setAutoArimaResults(res);
       setParameters({ ...parameters, p: res.best_p, d: res.best_d, q: res.best_q });
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Auto-search failed');
@@ -259,7 +253,6 @@ export const ModelWorkspacePage: React.FC = () => {
     }
   };
 
-  // Prepare Forecast Overlay Chart Data
   const forecastChartData = () => {
     if (!fitResult) return [];
     const historical = fitResult.timestamps.map((t, idx) => ({
@@ -280,7 +273,6 @@ export const ModelWorkspacePage: React.FC = () => {
       upper: fitResult.upper_interval[idx]
     }));
 
-    // Connect the last historical point with the first forecast point
     if (historical.length > 0 && future.length > 0) {
       const lastHist = historical[historical.length - 1];
       future.unshift({
@@ -296,7 +288,6 @@ export const ModelWorkspacePage: React.FC = () => {
     return [...historical.slice(-60), ...future];
   };
 
-  // Residual series for diagnostics
   const residualChartData = () => {
     if (!fitResult) return [];
     return fitResult.timestamps.slice(-60).map((t, idx) => {
@@ -308,39 +299,59 @@ export const ModelWorkspacePage: React.FC = () => {
     });
   };
 
+  const handleCopyCode = () => {
+    if (fitResult?.python_code) {
+      navigator.clipboard.writeText(fitResult.python_code);
+      setCopiedCode(true);
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
   return (
     <div className="space-y-6">
-      {/* Model Header */}
-      <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
+      {/* Model Header & Controls */}
+      <div className={`p-5 rounded-2xl border transition ${
+        isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+      }`}>
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono px-2 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20 uppercase font-semibold">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-blue-500/10 text-blue-600 dark:text-cyan-300 border border-blue-500/20 uppercase">
                 {modelType.toUpperCase()}
               </span>
-              <h1 className="text-xl font-bold text-white">{config.title}</h1>
+              <h1 className="text-lg font-bold text-[var(--text-primary)]">{config.title}</h1>
             </div>
-            <p className="text-xs text-slate-400 mt-1 max-w-2xl">{config.description}</p>
-            <div className="mt-2 text-xs font-mono text-cyan-400 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800 inline-block">
+            <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-2xl leading-relaxed">{config.description}</p>
+            <div className={`mt-2 text-xs font-mono px-3 py-1.5 rounded-lg border inline-block ${
+              isDark ? 'bg-slate-950/60 border-slate-800 text-cyan-300' : 'bg-slate-50 border-slate-200 text-blue-700'
+            }`}>
               {config.math}
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2.5 shrink-0">
             {(modelType === 'arima' || modelType === 'arma') && (
               <button
                 onClick={handleAutoArimaSearch}
                 disabled={autoSearching}
-                className="px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-50"
+                className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition cursor-pointer disabled:opacity-50 ${
+                  isDark
+                    ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
+                }`}
                 title="Automated grid search minimizing AIC"
               >
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                {autoSearching ? 'Searching Optimal Order...' : 'Auto-Search (p, d, q)'}
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                {autoSearching ? 'Searching...' : 'Auto-Search'}
               </button>
             )}
             <button
               onClick={() => setParameters(config.defaultParams)}
-              className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium flex items-center gap-1.5"
+              className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition cursor-pointer ${
+                isDark
+                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+              }`}
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Reset
@@ -348,19 +359,21 @@ export const ModelWorkspacePage: React.FC = () => {
             <button
               onClick={handleFit}
               disabled={loading}
-              className="px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50"
+              className="px-4 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
-              {loading ? 'Estimating Model...' : 'Fit Model'}
+              {loading ? 'Estimating...' : 'Fit Model'}
             </button>
           </div>
         </div>
 
-        {/* Configuration Bar */}
-        <div className="mt-5 pt-4 border-t border-slate-800/80 flex flex-wrap items-center gap-4 text-xs">
+        {/* Minimal Parameter Configuration Bar */}
+        <div className={`mt-4 pt-4 border-t flex flex-wrap items-center gap-4 text-xs ${
+          isDark ? 'border-slate-800/80' : 'border-slate-200/80'
+        }`}>
           {config.paramFields.map((field) => (
             <div key={field.key} className="flex items-center gap-2">
-              <span className="text-slate-400 font-medium">{field.label}:</span>
+              <span className="text-[var(--text-tertiary)] font-medium">{field.label}:</span>
               {field.type === 'number' ? (
                 <input
                   type="number"
@@ -368,13 +381,17 @@ export const ModelWorkspacePage: React.FC = () => {
                   max={field.max}
                   value={parameters[field.key] ?? ''}
                   onChange={(e) => setParameters({ ...parameters, [field.key]: Number(e.target.value) })}
-                  className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono text-xs"
+                  className={`w-16 border rounded-lg px-2 py-1 font-mono text-xs ${
+                    isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
                 />
               ) : (
                 <select
                   value={parameters[field.key] ?? ''}
                   onChange={(e) => setParameters({ ...parameters, [field.key]: e.target.value })}
-                  className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-200 text-xs"
+                  className={`border rounded-lg px-2.5 py-1 text-xs ${
+                    isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
                 >
                   {field.options?.map((opt) => (
                     <option key={opt.label} value={opt.value}>
@@ -387,23 +404,27 @@ export const ModelWorkspacePage: React.FC = () => {
           ))}
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Horizon (h):</span>
+            <span className="text-[var(--text-tertiary)] font-medium">Horizon:</span>
             <input
               type="number"
               min="1"
               max="100"
               value={forecastHorizon}
               onChange={(e) => setForecastHorizon(Number(e.target.value))}
-              className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono text-xs"
+              className={`w-16 border rounded-lg px-2 py-1 font-mono text-xs ${
+                isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+              }`}
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">CI Level:</span>
+            <span className="text-[var(--text-tertiary)] font-medium">Confidence:</span>
             <select
               value={confidenceLevel}
               onChange={(e) => setConfidenceLevel(Number(e.target.value))}
-              className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 text-xs"
+              className={`border rounded-lg px-2.5 py-1 text-xs ${
+                isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+              }`}
             >
               <option value={0.90}>90%</option>
               <option value={0.95}>95%</option>
@@ -415,8 +436,10 @@ export const ModelWorkspacePage: React.FC = () => {
 
       {/* Warnings & Errors */}
       {errorMsg && (
-        <div className="p-4 rounded-xl bg-rose-950/20 border border-rose-500/40 text-xs text-rose-300 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+        <div className={`p-4 rounded-xl border text-xs flex items-start gap-2.5 ${
+          isDark ? 'bg-rose-950/20 border-rose-500/40 text-rose-300' : 'bg-rose-50 border-rose-200 text-rose-700'
+        }`}>
+          <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
           <div>
             <div className="font-semibold">Model Estimation Error:</div>
             <div>{errorMsg}</div>
@@ -425,10 +448,12 @@ export const ModelWorkspacePage: React.FC = () => {
       )}
 
       {fitResult && fitResult.warnings.length > 0 && (
-        <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/40 text-xs text-amber-300 space-y-1">
+        <div className={`p-4 rounded-xl border text-xs space-y-1 ${
+          isDark ? 'bg-amber-950/20 border-amber-500/40 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-800'
+        }`}>
           {fitResult.warnings.map((w, i) => (
             <div key={i} className="flex items-center gap-2">
-              <Info className="w-3.5 h-3.5 shrink-0" />
+              <Info className="w-3.5 h-3.5 text-amber-500 shrink-0" />
               <span>{w}</span>
             </div>
           ))}
@@ -439,21 +464,25 @@ export const ModelWorkspacePage: React.FC = () => {
       {fitResult && (
         <div className="space-y-4">
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
+          <div className={`flex items-center gap-1.5 border-b pb-2 ${
+            isDark ? 'border-slate-800' : 'border-slate-200'
+          }`}>
             {[
               { id: 'forecast', label: '1. Forecast & Fitted Overlay' },
               { id: 'diagnostics', label: '2. Residual Diagnostics' },
-              { id: 'parameters', label: '3. Estimated Parameters' },
+              { id: 'parameters', label: '3. Parameters' },
               { id: 'metrics', label: '4. Evaluation Metrics' },
-              { id: 'code', label: '5. Python Reproducibility Script' }
+              { id: 'code', label: '5. Python Script' }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
                   activeTab === tab.id
-                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                    ? isDark
+                      ? 'bg-blue-600/20 text-blue-300 border border-blue-500/30 font-semibold'
+                      : 'bg-blue-50 text-blue-700 border border-blue-200 font-semibold shadow-xs'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
               >
                 {tab.label}
@@ -463,28 +492,36 @@ export const ModelWorkspacePage: React.FC = () => {
 
           {/* TAB 1: Forecast Chart */}
           {activeTab === 'forecast' && (
-            <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-              <div className="flex items-center justify-between mb-4">
+            <div className={`p-5 rounded-2xl border transition ${
+              isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+            }`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
                 <div>
-                  <h2 className="text-base font-semibold text-white">Observed, Fitted & Out-of-Sample Forecast</h2>
-                  <p className="text-xs text-slate-400">
+                  <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                    Observed, In-Sample Fitted & Forward Forecast
+                  </h2>
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                     Confidence interval: {(confidenceLevel * 100).toFixed(0)}% shaded boundary
                   </p>
                 </div>
-                <div className="flex items-center gap-4 text-xs">
-                  <span className="flex items-center gap-1.5 text-blue-400">
-                    <span className="w-3 h-0.5 bg-blue-500 rounded"></span> Actual
+                <div className="flex items-center gap-3 text-xs font-medium">
+                  <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                    <span className="w-2.5 h-1 bg-blue-500 rounded-full"></span> Actual
                   </span>
-                  <span className="flex items-center gap-1.5 text-emerald-400">
-                    <span className="w-3 h-0.5 bg-emerald-500 rounded"></span> In-Sample Fitted
+                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                    <span className="w-2.5 h-1 bg-emerald-500 rounded-full"></span> Fitted
                   </span>
-                  <span className="flex items-center gap-1.5 text-rose-400">
-                    <span className="w-3 h-0.5 bg-rose-500 rounded"></span> Forecast
+                  <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                    <span className="w-2.5 h-1 bg-rose-500 rounded-full"></span> Forecast
                   </span>
                   <a
                     href={apiService.getForecastCsvUrl(fitResult.analysis_id)}
                     download
-                    className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono ml-2"
+                    className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-mono ml-2 transition ${
+                      isDark
+                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                    }`}
                   >
                     <Download className="w-3 h-3" />
                     CSV
@@ -494,15 +531,24 @@ export const ModelWorkspacePage: React.FC = () => {
 
               <div className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={forecastChartData()}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 11 }} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }} />
-                    <Area type="monotone" dataKey="upper" stroke="none" fill="#38bdf8" fillOpacity={0.15} />
-                    <Area type="monotone" dataKey="lower" stroke="none" fill="#38bdf8" fillOpacity={0.15} />
-                    <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} />
-                    <Line type="monotone" dataKey="fitted" stroke="#10b981" strokeWidth={1.5} dot={false} />
+                  <AreaChart data={forecastChartData()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                    <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 10 }} />
+                    <YAxis stroke={chartTheme.axis} tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: chartTheme.tooltipBg,
+                        borderColor: chartTheme.tooltipBorder,
+                        color: chartTheme.tooltipText,
+                        borderRadius: '10px',
+                        fontSize: '11px',
+                        boxShadow: chartTheme.tooltipShadow
+                      }}
+                    />
+                    <Area type="monotone" dataKey="upper" stroke="none" fill={chartTheme.confidenceFill} />
+                    <Area type="monotone" dataKey="lower" stroke="none" fill={chartTheme.confidenceFill} />
+                    <Line type="monotone" dataKey="actual" stroke={chartTheme.actual} strokeWidth={2} dot={false} />
+                    <Line type="monotone" dataKey="fitted" stroke={chartTheme.fitted} strokeWidth={1.5} dot={false} />
                     <Line type="monotone" dataKey="forecast" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />
                   </AreaChart>
                 </ResponsiveContainer>
@@ -522,7 +568,7 @@ export const ModelWorkspacePage: React.FC = () => {
                     badge: "Green Curve",
                     badgeColor: "emerald",
                     label: "Fitted Values (Ŷ_t)",
-                    text: "The model's in-sample one-step-ahead expectations. Tight alignment with the blue curve indicates strong explanatory power."
+                    text: "The model's in-sample one-step-ahead expectations. Tight alignment indicates strong explanatory power."
                   },
                   {
                     badge: "Rose Red Curve",
@@ -534,7 +580,7 @@ export const ModelWorkspacePage: React.FC = () => {
                     badge: "Light Cyan Band",
                     badgeColor: "cyan",
                     label: "Prediction Intervals (±1.96σ)",
-                    text: "Probabilistic uncertainty funnel (95% confidence). It naturally expands wider over longer horizons as cumulative forecast variance compounds."
+                    text: "Probabilistic uncertainty funnel (95% confidence). Expands over longer horizons as variance compounds."
                   }
                 ]}
                 takeaway="A well-specified model tracks turning points in actual data without excessive lag, while maintaining realistic expanding prediction intervals that encompass likely future outcomes."
@@ -547,15 +593,18 @@ export const ModelWorkspacePage: React.FC = () => {
             <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Residual Time Plot */}
-                <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-                  <h3 className="text-sm font-semibold text-white mb-1">Residuals Over Time e_t</h3>
-                  <p className="text-xs text-slate-400 mb-3">Checking for mean zero and homoscedasticity</p>
+                <div className={`p-5 rounded-2xl border transition ${
+                  isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+                }`}>
+                  <h3 className="text-sm font-bold text-[var(--text-primary)] mb-0.5">Residuals Over Time (e_t)</h3>
+                  <p className="text-xs text-[var(--text-secondary)] mb-3">Checking for mean zero and homoscedasticity</p>
                   <div className="h-56">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={residualChartData()}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                        <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
-                        <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
+                      <LineChart data={residualChartData()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                        <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                        <YAxis stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                        <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '8px', fontSize: '10px' }} />
                         <Line type="monotone" dataKey="residual" stroke="#f43f5e" dot={false} strokeWidth={1.5} />
                       </LineChart>
                     </ResponsiveContainer>
@@ -563,23 +612,33 @@ export const ModelWorkspacePage: React.FC = () => {
                 </div>
 
                 {/* Ljung-Box Test & Distribution */}
-                <div className="bg-[#101728] border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
+                <div className={`p-5 rounded-2xl border flex flex-col justify-between transition ${
+                  isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+                }`}>
                   <div>
-                    <h3 className="text-sm font-semibold text-white mb-1">Ljung-Box White Noise Test</h3>
-                    <p className="text-xs text-slate-400 mb-3">Hypothesis test for independence of residuals</p>
+                    <h3 className="text-sm font-bold text-[var(--text-primary)] mb-0.5">Ljung-Box White Noise Test</h3>
+                    <p className="text-xs text-[var(--text-secondary)] mb-3">Hypothesis test for independence of residuals</p>
                     {fitResult.diagnostics.ljung_box && (
-                      <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-800 space-y-2 text-xs font-mono">
+                      <div className={`p-3 rounded-xl border space-y-1.5 text-xs font-mono ${
+                        isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                      }`}>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">Statistic (Q):</span>
-                          <span className="text-white font-bold">{fitResult.diagnostics.ljung_box.statistic.toFixed(4)}</span>
+                          <span className="text-[var(--text-tertiary)]">Statistic (Q):</span>
+                          <span className="text-[var(--text-primary)] font-bold">{fitResult.diagnostics.ljung_box.statistic.toFixed(4)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-slate-400">p-value:</span>
-                          <span className={fitResult.diagnostics.ljung_box.p_value > 0.05 ? 'text-emerald-400 font-bold' : 'text-amber-400 font-bold'}>
+                          <span className="text-[var(--text-tertiary)]">p-value:</span>
+                          <span className={`font-bold ${
+                            fitResult.diagnostics.ljung_box.p_value > 0.05
+                              ? isDark ? 'text-emerald-400' : 'text-emerald-600'
+                              : isDark ? 'text-amber-400' : 'text-amber-600'
+                          }`}>
                             {fitResult.diagnostics.ljung_box.p_value.toFixed(4)}
                           </span>
                         </div>
-                        <div className="text-[11px] text-slate-300 font-sans mt-2 pt-2 border-t border-slate-800">
+                        <div className={`text-[11px] font-sans pt-2 border-t text-[var(--text-secondary)] ${
+                          isDark ? 'border-slate-800' : 'border-slate-200'
+                        }`}>
                           {fitResult.diagnostics.ljung_box.interpretation}
                         </div>
                       </div>
@@ -588,17 +647,17 @@ export const ModelWorkspacePage: React.FC = () => {
 
                   {fitResult.diagnostics.histogram && (
                     <div className="mt-4">
-                      <h4 className="text-xs font-semibold text-slate-300 mb-2">Residual Histogram</h4>
-                      <div className="h-32">
+                      <h4 className="text-xs font-semibold text-[var(--text-primary)] mb-2">Residual Histogram</h4>
+                      <div className="h-28">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={fitResult.diagnostics.histogram.bins.map((b, i) => ({
                             bin: b.toFixed(1),
                             count: fitResult.diagnostics.histogram?.counts[i]
-                          }))}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                            <XAxis dataKey="bin" stroke="#64748b" tick={{ fontSize: 9 }} />
-                            <YAxis stroke="#64748b" tick={{ fontSize: 9 }} />
-                            <Bar dataKey="count" fill="#6366f1" />
+                          }))} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                            <XAxis dataKey="bin" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                            <YAxis stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                            <Bar dataKey="count" fill={chartTheme.actual} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -622,36 +681,40 @@ export const ModelWorkspacePage: React.FC = () => {
                     badge: "Constant Variance",
                     badgeColor: "slate",
                     label: "Homoscedasticity",
-                    text: "Residual scatter thickness should remain stable across time rather than expanding (heteroscedasticity)."
+                    text: "Residual scatter thickness should remain stable across time rather than expanding."
                   },
                   {
                     badge: "Ljung-Box (p > 0.05)",
                     badgeColor: "emerald",
                     label: "White Noise Test",
-                    text: "Null hypothesis H₀: residuals are uncorrelated. If p > 0.05, you cannot reject H₀ (pass). If p < 0.05, serial correlation remains in the errors."
+                    text: "Null hypothesis H₀: residuals are uncorrelated. If p > 0.05, you cannot reject H₀ (pass). If p < 0.05, serial correlation remains."
                   },
                   {
                     badge: "Bell-Shaped Curve",
                     badgeColor: "purple",
                     label: "Histogram Normality",
-                    text: "The histogram should resemble a symmetric Gaussian bell curve centered at zero without severe skewness or heavy fat tails."
+                    text: "The histogram should resemble a symmetric Gaussian bell curve centered at zero without severe skewness."
                   }
                 ]}
-                takeaway="A passing Ljung-Box test (p > 0.05) and a random, pattern-free residual plot confirm that your model has captured all systematic predictability from the series."
+                takeaway="A passing Ljung-Box test (p > 0.05) and a random, pattern-free residual plot confirm that your model captured all systematic predictability."
               />
             </div>
           )}
 
           {/* TAB 3: Estimated Parameters */}
           {activeTab === 'parameters' && (
-            <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-              <h3 className="text-base font-semibold text-white mb-1">Estimated Model Coefficients</h3>
-              <p className="text-xs text-slate-400 mb-4">Maximum likelihood / OLS parameter estimates</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className={`p-5 rounded-2xl border transition ${
+              isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+            }`}>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-0.5">Estimated Model Coefficients</h3>
+              <p className="text-xs text-[var(--text-secondary)] mb-4">Maximum likelihood / OLS parameter estimates</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {Object.entries(fitResult.param_estimates).map(([name, val]) => (
-                  <div key={name} className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-                    <span className="text-xs text-slate-400 font-mono">{name}</span>
-                    <div className="text-xl font-bold text-cyan-400 font-mono mt-1">
+                  <div key={name} className={`p-3.5 rounded-xl border ${
+                    isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                  }`}>
+                    <span className="text-[11px] text-[var(--text-tertiary)] font-mono">{name}</span>
+                    <div className="text-lg font-bold text-blue-600 dark:text-cyan-400 font-mono mt-1">
                       {typeof val === 'number' ? val.toFixed(5) : val}
                     </div>
                   </div>
@@ -662,27 +725,37 @@ export const ModelWorkspacePage: React.FC = () => {
 
           {/* TAB 4: Evaluation Metrics */}
           {activeTab === 'metrics' && (
-            <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-              <h3 className="text-base font-semibold text-white mb-1">In-Sample Fit Metrics & Information Criteria</h3>
-              <p className="text-xs text-slate-400 mb-4">Error metrics calculated over valid historical observations</p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-                  <span className="text-xs text-slate-400">MAE</span>
-                  <div className="text-xl font-bold text-white font-mono mt-1">{fitResult.metrics.mae ?? '—'}</div>
+            <div className={`p-5 rounded-2xl border transition ${
+              isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+            }`}>
+              <h3 className="text-sm font-bold text-[var(--text-primary)] mb-0.5">In-Sample Fit Metrics & Information Criteria</h3>
+              <p className="text-xs text-[var(--text-secondary)] mb-4">Error metrics calculated over valid historical observations</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className={`p-3.5 rounded-xl border ${
+                  isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                }`}>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">MAE</span>
+                  <div className="text-lg font-bold text-[var(--text-primary)] font-mono mt-1">{fitResult.metrics.mae ?? '—'}</div>
                 </div>
-                <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-                  <span className="text-xs text-slate-400">RMSE</span>
-                  <div className="text-xl font-bold text-white font-mono mt-1">{fitResult.metrics.rmse ?? '—'}</div>
+                <div className={`p-3.5 rounded-xl border ${
+                  isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                }`}>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">RMSE</span>
+                  <div className="text-lg font-bold text-[var(--text-primary)] font-mono mt-1">{fitResult.metrics.rmse ?? '—'}</div>
                 </div>
-                <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-                  <span className="text-xs text-slate-400">MAPE (%)</span>
-                  <div className="text-xl font-bold text-white font-mono mt-1">
+                <div className={`p-3.5 rounded-xl border ${
+                  isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                }`}>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">MAPE (%)</span>
+                  <div className="text-lg font-bold text-[var(--text-primary)] font-mono mt-1">
                     {fitResult.metrics.mape !== null ? `${fitResult.metrics.mape}%` : '—'}
                   </div>
                 </div>
-                <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-                  <span className="text-xs text-slate-400">AIC</span>
-                  <div className="text-xl font-bold text-violet-400 font-mono mt-1">
+                <div className={`p-3.5 rounded-xl border ${
+                  isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                }`}>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">AIC</span>
+                  <div className="text-lg font-bold text-violet-600 dark:text-violet-400 font-mono mt-1">
                     {fitResult.metrics.aic?.toFixed(2) ?? '—'}
                   </div>
                 </div>
@@ -692,32 +765,35 @@ export const ModelWorkspacePage: React.FC = () => {
 
           {/* TAB 5: Python Reproducibility Script */}
           {activeTab === 'code' && (
-            <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
+            <div className={`p-5 rounded-2xl border transition ${
+              isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+            }`}>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="text-base font-semibold text-white flex items-center gap-2">
-                    <Code2 className="w-5 h-5 text-emerald-400" />
-                    Executable Python Replication Code
+                  <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                    <Code2 className="w-4 h-4 text-emerald-500" />
+                    Executable Python Code
                   </h3>
-                  <p className="text-xs text-slate-400">
+                  <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                     Standalone Python snippet using statsmodels and pandas reproducing this exact statistical model fit.
                   </p>
                 </div>
                 <button
-                  onClick={() => {
-                    if (fitResult.python_code) {
-                      navigator.clipboard.writeText(fitResult.python_code);
-                      alert('Python code copied to clipboard!');
-                    }
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition"
+                  onClick={handleCopyCode}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+                    isDark
+                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+                  }`}
                 >
-                  <Copy className="w-3.5 h-3.5" />
-                  Copy Code
+                  {copiedCode ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copiedCode ? 'Copied!' : 'Copy Code'}
                 </button>
               </div>
 
-              <pre className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-emerald-300 overflow-x-auto leading-relaxed">
+              <pre className={`p-4 rounded-xl border text-xs font-mono overflow-x-auto leading-relaxed ${
+                isDark ? 'bg-slate-950 border-slate-800 text-emerald-300' : 'bg-slate-900 border-slate-800 text-emerald-400'
+              }`}>
                 {fitResult.python_code || '# Code unavailable for this model.'}
               </pre>
             </div>

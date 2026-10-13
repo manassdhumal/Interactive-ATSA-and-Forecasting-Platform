@@ -1,19 +1,23 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { Database, Filter, Calendar, Activity, Zap } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
+import { Database, Filter, Calendar, Activity, Sun, Moon } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { datasets, selectedDataset, selectedTarget, setSelectedDataset, setSelectedTarget } = useApp();
+  const { isDark, toggleTheme } = useTheme();
 
   return (
-    <header className="h-16 bg-[#080d19]/80 backdrop-blur-xl border-b border-slate-800/80 px-6 flex items-center justify-between sticky top-0 z-20 shadow-md">
-      <div className="flex items-center gap-4">
+    <header className="h-16 bg-[var(--bg-header)] backdrop-blur-xl border-b border-[var(--border-subtle)] px-6 flex items-center justify-between sticky top-0 z-20 transition-colors duration-200">
+      <div className="flex items-center gap-3">
         {/* Active Dataset Selector */}
-        <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-1.5 shadow-sm">
-          <Database className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Dataset</span>
+        <div className="flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 shadow-xs transition-colors">
+          <Database className={`w-3.5 h-3.5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+          <span className="text-[11px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+            Dataset
+          </span>
           <select
-            className="bg-transparent text-slate-200 text-xs font-semibold focus:outline-none cursor-pointer pr-1"
+            className="bg-transparent text-[var(--text-primary)] text-xs font-semibold focus:outline-none cursor-pointer pr-1"
             value={selectedDataset?.id || ''}
             onChange={(e) => {
               const found = datasets.find(d => d.id === e.target.value);
@@ -21,7 +25,11 @@ export const Header: React.FC = () => {
             }}
           >
             {datasets.map((d) => (
-              <option key={d.id} value={d.id} className="bg-slate-900 text-slate-200">
+              <option
+                key={d.id}
+                value={d.id}
+                className={isDark ? 'bg-slate-900 text-slate-200' : 'bg-white text-slate-800'}
+              >
                 {d.name} {d.is_sample ? '(Sample)' : ''}
               </option>
             ))}
@@ -30,16 +38,24 @@ export const Header: React.FC = () => {
 
         {/* Target Series Selector */}
         {selectedDataset && (
-          <div className="flex items-center gap-2 bg-slate-900/80 border border-slate-800 rounded-xl px-3 py-1.5 shadow-sm">
-            <Filter className="w-3.5 h-3.5 text-cyan-400" />
-            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Target</span>
+          <div className="flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--border-subtle)] rounded-xl px-3 py-1.5 shadow-xs transition-colors">
+            <Filter className={`w-3.5 h-3.5 ${isDark ? 'text-cyan-400' : 'text-blue-600'}`} />
+            <span className="text-[11px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
+              Target
+            </span>
             <select
-              className="bg-transparent text-cyan-300 text-xs font-semibold focus:outline-none cursor-pointer font-mono"
+              className={`bg-transparent text-xs font-semibold focus:outline-none cursor-pointer font-mono ${
+                isDark ? 'text-cyan-300' : 'text-blue-600'
+              }`}
               value={selectedTarget}
               onChange={(e) => setSelectedTarget(e.target.value)}
             >
               {selectedDataset.numeric_cols.map((col) => (
-                <option key={col} value={col} className="bg-slate-900 text-slate-200">
+                <option
+                  key={col}
+                  value={col}
+                  className={isDark ? 'bg-slate-900 text-slate-200' : 'bg-white text-slate-800'}
+                >
                   {col}
                 </option>
               ))}
@@ -48,23 +64,52 @@ export const Header: React.FC = () => {
         )}
       </div>
 
-      {/* Dataset quick badge & metadata pill */}
-      {selectedDataset && (
-        <div className="flex items-center gap-3 text-xs">
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/80 text-slate-300">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-slate-400 text-[11px]">Interval:</span>
-            <span className="font-mono text-[11px] text-cyan-300">
-              {selectedDataset.date_range[0]?.slice(0, 10)} → {selectedDataset.date_range[1]?.slice(0, 10)}
-            </span>
+      <div className="flex items-center gap-3">
+        {/* Dataset quick badge & metadata pill */}
+        {selectedDataset && (
+          <div className="hidden md:flex items-center gap-2.5 text-xs">
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-card-subtle)] border border-[var(--border-subtle)] text-[var(--text-secondary)]">
+              <Calendar className="w-3.5 h-3.5 text-[var(--text-tertiary)]" />
+              <span className="text-[11px] font-mono">
+                {selectedDataset.date_range[0]?.slice(0, 10)} → {selectedDataset.date_range[1]?.slice(0, 10)}
+              </span>
+            </div>
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium ${
+              isDark
+                ? 'bg-blue-950/30 border-blue-500/30 text-blue-300'
+                : 'bg-blue-50 border-blue-200 text-blue-700'
+            }`}>
+              <Activity className="w-3.5 h-3.5" />
+              <span className="font-mono font-bold">{selectedDataset.total_rows}</span>
+              <span className="text-[11px] opacity-80">obs</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-blue-950/30 border border-blue-500/30 text-blue-300">
-            <Activity className="w-3.5 h-3.5 text-blue-400" />
-            <span className="font-mono font-bold text-xs">{selectedDataset.total_rows}</span>
-            <span className="text-[11px] text-slate-400">observations</span>
-          </div>
-        </div>
-      )}
+        )}
+
+        {/* Light / Dark Mode Toggle */}
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle theme mode"
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition cursor-pointer ${
+            isDark
+              ? 'bg-slate-800/80 hover:bg-slate-700 text-amber-300 border-slate-700'
+              : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
+          }`}
+        >
+          {isDark ? (
+            <>
+              <Sun className="w-4 h-4 text-amber-400" />
+              <span className="hidden sm:inline text-[11px] font-medium text-slate-200">Light</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-4 h-4 text-blue-600" />
+              <span className="hidden sm:inline text-[11px] font-medium text-slate-700">Dark</span>
+            </>
+          )}
+        </button>
+      </div>
     </header>
   );
 };

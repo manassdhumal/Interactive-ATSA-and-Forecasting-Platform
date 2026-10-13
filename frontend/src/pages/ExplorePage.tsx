@@ -1,16 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
 import { DescriptiveStats, RollingTrendData, DecompositionData } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, ScatterChart, Scatter, Brush
+  CartesianGrid, ScatterChart, Scatter
 } from 'recharts';
 import { Layers, Activity, Sliders, TrendingUp } from 'lucide-react';
 import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const ExplorePage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
+  const { isDark, chartTheme } = useTheme();
+  const [activeTab, setActiveTab] = useState<'decomp' | 'rolling' | 'lags'>('decomp');
   const [stats, setStats] = useState<DescriptiveStats | null>(null);
   const [rollingData, setRollingData] = useState<RollingTrendData | null>(null);
   const [decompData, setDecompData] = useState<DecompositionData | null>(null);
@@ -57,294 +60,374 @@ export const ExplorePage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Exploratory Time Series Analysis</h1>
-        <p className="text-sm text-slate-400">
-          Decomposition, rolling statistics, moment metrics, and lag phase plots
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
+            Exploratory Time Series Analysis
+          </h1>
+          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+            Statistical moments, classical decomposition, rolling dispersion, and lag phase dynamics
+          </p>
+        </div>
+
+        {/* Minimalist Tab Navigation */}
+        <div className={`flex items-center p-1 rounded-xl border text-xs font-medium self-start ${
+          isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'
+        }`}>
+          <button
+            onClick={() => setActiveTab('decomp')}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              activeTab === 'decomp'
+                ? isDark ? 'bg-blue-600 text-white font-semibold' : 'bg-white text-slate-900 font-semibold shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Decomposition
+          </button>
+          <button
+            onClick={() => setActiveTab('rolling')}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              activeTab === 'rolling'
+                ? isDark ? 'bg-blue-600 text-white font-semibold' : 'bg-white text-slate-900 font-semibold shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Rolling Dynamics
+          </button>
+          <button
+            onClick={() => setActiveTab('lags')}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              activeTab === 'lags'
+                ? isDark ? 'bg-blue-600 text-white font-semibold' : 'bg-white text-slate-900 font-semibold shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Lag Phase Plots
+          </button>
+        </div>
       </div>
 
-      {/* Summary Metrics */}
+      {/* Summary Statistical Moments Strip */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-          <div className="bg-[#101728] border border-slate-800 rounded-lg p-3">
-            <span className="text-[11px] text-slate-400">Observations</span>
-            <div className="text-lg font-bold text-white font-mono mt-0.5">{stats.count}</div>
+          <div className={`p-3 rounded-xl border ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <span className="text-[10px] uppercase font-semibold text-[var(--text-tertiary)]">Observations</span>
+            <div className="text-base font-bold text-[var(--text-primary)] font-mono mt-0.5">{stats.count}</div>
           </div>
-          <div className="bg-[#101728] border border-slate-800 rounded-lg p-3">
-            <span className="text-[11px] text-slate-400">Mean</span>
-            <div className="text-lg font-bold text-blue-400 font-mono mt-0.5">{stats.mean.toFixed(2)}</div>
+          <div className={`p-3 rounded-xl border ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <span className="text-[10px] uppercase font-semibold text-[var(--text-tertiary)]">Mean</span>
+            <div className="text-base font-bold text-blue-600 dark:text-blue-400 font-mono mt-0.5">{stats.mean.toFixed(2)}</div>
           </div>
-          <div className="bg-[#101728] border border-slate-800 rounded-lg p-3">
-            <span className="text-[11px] text-slate-400">Median</span>
-            <div className="text-lg font-bold text-slate-200 font-mono mt-0.5">{stats.median.toFixed(2)}</div>
+          <div className={`p-3 rounded-xl border ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <span className="text-[10px] uppercase font-semibold text-[var(--text-tertiary)]">Median</span>
+            <div className="text-base font-bold text-[var(--text-primary)] font-mono mt-0.5">{stats.median.toFixed(2)}</div>
           </div>
-          <div className="bg-[#101728] border border-slate-800 rounded-lg p-3">
-            <span className="text-[11px] text-slate-400">Std Dev</span>
-            <div className="text-lg font-bold text-slate-200 font-mono mt-0.5">{stats.std.toFixed(2)}</div>
+          <div className={`p-3 rounded-xl border ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <span className="text-[10px] uppercase font-semibold text-[var(--text-tertiary)]">Std Dev</span>
+            <div className="text-base font-bold text-[var(--text-primary)] font-mono mt-0.5">{stats.std.toFixed(2)}</div>
           </div>
-          <div className="bg-[#101728] border border-slate-800 rounded-lg p-3">
-            <span className="text-[11px] text-slate-400">Skewness</span>
-            <div className="text-lg font-bold text-cyan-400 font-mono mt-0.5">{stats.skewness?.toFixed(2) ?? '—'}</div>
+          <div className={`p-3 rounded-xl border ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <span className="text-[10px] uppercase font-semibold text-[var(--text-tertiary)]">Skewness</span>
+            <div className="text-base font-bold text-cyan-600 dark:text-cyan-400 font-mono mt-0.5">{stats.skewness?.toFixed(2) ?? '—'}</div>
           </div>
-          <div className="bg-[#101728] border border-slate-800 rounded-lg p-3">
-            <span className="text-[11px] text-slate-400">Kurtosis</span>
-            <div className="text-lg font-bold text-violet-400 font-mono mt-0.5">{stats.kurtosis?.toFixed(2) ?? '—'}</div>
+          <div className={`p-3 rounded-xl border ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <span className="text-[10px] uppercase font-semibold text-[var(--text-tertiary)]">Kurtosis</span>
+            <div className="text-base font-bold text-violet-600 dark:text-violet-400 font-mono mt-0.5">{stats.kurtosis?.toFixed(2) ?? '—'}</div>
           </div>
         </div>
       )}
 
-      {/* Rolling Stats Chart */}
-      <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-base font-semibold text-white">Rolling Window Dynamics</h2>
-            <p className="text-xs text-slate-400">Rolling mean and rolling dispersion across temporal windows</p>
+      {/* Tab 1: Classical & STL Decomposition */}
+      {activeTab === 'decomp' && (
+        <div className={`p-5 rounded-2xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                <Layers className="w-4 h-4 text-cyan-500" />
+                Time Series Decomposition (Observed = Trend + Seasonal + Residual)
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Separates underlying secular trend, cyclical periodicity, and irregular innovations
+              </p>
+            </div>
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[var(--text-tertiary)]">Model:</span>
+                <select
+                  value={decompModel}
+                  onChange={(e) => setDecompModel(e.target.value as any)}
+                  className={`border rounded-lg px-2 py-1 text-xs ${
+                    isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
+                >
+                  <option value="additive">Additive (Y = T + S + R)</option>
+                  <option value="multiplicative">Multiplicative (Y = T × S × R)</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[var(--text-tertiary)]">Period:</span>
+                <input
+                  type="number"
+                  min="2"
+                  max="365"
+                  value={decompPeriod}
+                  onChange={(e) => setDecompPeriod(Number(e.target.value))}
+                  className={`w-14 border rounded-lg px-2 py-1 font-mono text-xs ${
+                    isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
+                />
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3 text-xs">
-            <span className="text-slate-400">Rolling Window (w):</span>
-            <input
-              type="number"
-              min="2"
-              max="60"
-              value={rollingWindow}
-              onChange={(e) => setRollingWindow(Number(e.target.value))}
-              className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono"
-            />
-          </div>
+
+          {loading || !decompData ? (
+            <div className="py-16 text-center text-xs text-[var(--text-tertiary)] font-mono">
+              Estimating decomposition components...
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {/* 4-Panel Subplots */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'}`}>
+                  <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400">1. Observed Series</span>
+                  <div className="h-40 w-full mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={decompPoints} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                        <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                        <YAxis stroke={chartTheme.axis} tick={{ fontSize: 9 }} domain={['auto', 'auto']} />
+                        <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '8px', fontSize: '10px' }} />
+                        <Line type="monotone" dataKey="observed" stroke={chartTheme.actual} strokeWidth={1.5} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'}`}>
+                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">2. Smoothed Trend</span>
+                  <div className="h-40 w-full mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={decompPoints} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                        <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                        <YAxis stroke={chartTheme.axis} tick={{ fontSize: 9 }} domain={['auto', 'auto']} />
+                        <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '8px', fontSize: '10px' }} />
+                        <Line type="monotone" dataKey="trend" stroke={chartTheme.trend} strokeWidth={1.5} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'}`}>
+                  <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400">3. Seasonal Pattern</span>
+                  <div className="h-40 w-full mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={decompPoints} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                        <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                        <YAxis stroke={chartTheme.axis} tick={{ fontSize: 9 }} domain={['auto', 'auto']} />
+                        <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '8px', fontSize: '10px' }} />
+                        <Line type="monotone" dataKey="seasonal" stroke={chartTheme.rolling} strokeWidth={1.5} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className={`p-3 rounded-xl border ${isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'}`}>
+                  <span className="text-[11px] font-semibold text-violet-600 dark:text-violet-400">4. Irregular Residual</span>
+                  <div className="h-40 w-full mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={decompPoints} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                        <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                        <YAxis stroke={chartTheme.axis} tick={{ fontSize: 9 }} domain={['auto', 'auto']} />
+                        <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '8px', fontSize: '10px' }} />
+                        <Line type="monotone" dataKey="residual" stroke="#8b5cf6" strokeWidth={1} dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              </div>
+
+              <ChartExplanation
+                title="Decomposition Mechanics & Mathematical Formulations"
+                summary="Time series decomposition partitions raw data into distinct deterministic and stochastic components to guide whether you need trend detrending, seasonal adjustment, or Holt-Winters/SARIMA models."
+                items={[
+                  {
+                    badge: "Additive Model",
+                    badgeColor: "blue",
+                    label: "Constant Amplitude",
+                    text: "Used when seasonal fluctuations remain constant in size regardless of the overall series level (Y = T + S + R)."
+                  },
+                  {
+                    badge: "Multiplicative",
+                    badgeColor: "amber",
+                    label: "Proportional Amplitude",
+                    text: "Used when seasonal swings grow proportionally larger as the series trends upward (Y = T × S × R)."
+                  },
+                  {
+                    badge: "Trend (T_t)",
+                    badgeColor: "emerald",
+                    label: "Long-run Trajectory",
+                    text: "Estimated using centered moving averages. Isolates secular secular shifts."
+                  },
+                  {
+                    badge: "Residuals (R_t)",
+                    badgeColor: "purple",
+                    label: "White Noise Check",
+                    text: "If residuals look like random noise around zero, the decomposition successfully extracted all systematic structure."
+                  }
+                ]}
+                takeaway="Examine the residuals: If systematic cycles remain in the residual plot, increase or calibrate the seasonal period 's'."
+                formula="Additive: Y_t = T_t + S_t + R_t \quad | \quad Multiplicative: Y_t = T_t \cdot S_t \cdot R_t"
+              />
+            </div>
+          )}
         </div>
+      )}
 
-        <div className="h-64 w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={seriesPoints}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 11 }} />
-              <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
-              <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }} />
-              <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={1.5} dot={false} name="Actual" />
-              <Line type="monotone" dataKey="rolling" stroke="#f59e0b" strokeWidth={2} dot={false} name="Rolling Mean" />
-              <Line type="monotone" dataKey="std" stroke="#a855f7" strokeWidth={1.5} strokeDasharray="3 3" dot={false} name="Rolling Std" />
-              <Brush dataKey="time" height={25} stroke="#38bdf8" fill="#0f172a" tickFormatter={(t) => t.slice(5)} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        <ChartExplanation
-          title="Interpreting Rolling Statistics & Volatility"
-          summary="Rolling statistics evaluate local stationarity. By computing moving moments inside a sliding window, you can determine whether the level (mean) and variance (volatility) remain stable across time."
-          items={[
-            {
-              badge: "Blue Line",
-              badgeColor: "blue",
-              label: "Actual Series",
-              text: "Raw chronological values. Sharp fluctuations highlight high-frequency noise or rapid regime shifts."
-            },
-            {
-              badge: "Amber Line",
-              badgeColor: "amber",
-              label: "Rolling Mean (μ_t)",
-              text: "Sliding window central tendency. A horizontal rolling mean indicates mean-stationarity, whereas an upward or downward slant indicates a drift/trend."
-            },
-            {
-              badge: "Purple Dashed",
-              badgeColor: "purple",
-              label: "Rolling Std Dev (σ_t)",
-              text: "Local dispersion measurement. If this curve flares up during certain periods, the series has heteroscedasticity (volatility clustering)."
-            },
-            {
-              badge: "Interactive Brush",
-              badgeColor: "cyan",
-              label: "Timeline Slider",
-              text: "Click and drag the bottom navigator handles to zoom in on specific sub-periods and inspect local cyclical patterns."
-            }
-          ]}
-          takeaway="Stationary time series maintain a flat horizontal rolling mean and a stable rolling standard deviation. Flaring purple lines or sloped amber lines suggest transformations (log or differencing) are required."
-        />
-      </div>
-
-      {/* 4-Panel Time Series Decomposition */}
-      <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-base font-semibold text-white">Time Series Decomposition (Observed = Trend + Seasonal + Residual)</h2>
-            <p className="text-xs text-slate-400">Classical Additive/Multiplicative or LOESS-based STL decomposition</p>
-          </div>
-          <div className="flex items-center gap-3 text-xs">
-            <select
-              value={decompModel}
-              onChange={(e) => setDecompModel(e.target.value as any)}
-              className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-200"
-            >
-              <option value="additive">Classical Additive</option>
-              <option value="multiplicative">Classical Multiplicative</option>
-              <option value="stl">STL (LOESS Robust Decomposition)</option>
-            </select>
-            <div className="flex items-center gap-1.5">
-              <span className="text-slate-400">Period (s):</span>
+      {/* Tab 2: Rolling Statistics */}
+      {activeTab === 'rolling' && (
+        <div className={`p-5 rounded-2xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-amber-500" />
+                Rolling Mean & Volatility Dynamics
+              </h2>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                Moving window statistics detecting local mean shifts and time-varying heteroskedasticity
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-[var(--text-tertiary)]">Window (w):</span>
               <input
                 type="number"
-                min="2"
-                max="365"
-                value={decompPeriod}
-                onChange={(e) => setDecompPeriod(Number(e.target.value))}
-                className="w-14 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-slate-200 font-mono"
+                min="3"
+                max="60"
+                value={rollingWindow}
+                onChange={(e) => setRollingWindow(Number(e.target.value))}
+                className={`w-14 border rounded-lg px-2 py-1 font-mono text-xs ${
+                  isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                }`}
               />
             </div>
           </div>
-        </div>
 
-        {decompData ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-800/80">
-              <h3 className="text-xs font-semibold text-blue-400 mb-2">1. Observed Series</h3>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={decompPoints}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={false} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <Line type="monotone" dataKey="observed" stroke="#3b82f6" dot={false} strokeWidth={1.5} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-800/80">
-              <h3 className="text-xs font-semibold text-emerald-400 mb-2">2. Trend Component</h3>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={decompPoints}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={false} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <Line type="monotone" dataKey="trend" stroke="#10b981" dot={false} strokeWidth={1.5} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-800/80">
-              <h3 className="text-xs font-semibold text-amber-400 mb-2">3. Seasonal Component</h3>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={decompPoints}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={false} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <Line type="monotone" dataKey="seasonal" stroke="#f59e0b" dot={false} strokeWidth={1.5} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/40 p-3 rounded-lg border border-slate-800/80">
-              <h3 className="text-xs font-semibold text-rose-400 mb-2">4. Residual Component</h3>
-              <div className="h-40">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={decompPoints}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                    <XAxis dataKey="time" stroke="#64748b" tick={false} />
-                    <YAxis stroke="#64748b" tick={{ fontSize: 10 }} />
-                    <Line type="monotone" dataKey="residual" stroke="#f43f5e" dot={false} strokeWidth={1.5} />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-8 text-center text-xs text-slate-400">
-            Series requires at least 2 full periods (2 × {decompPeriod} = {2 * decompPeriod} observations) for decomposition.
-          </div>
-        )}
-
-        <ChartExplanation
-          title="Understanding Time Series Decomposition"
-          summary="Decomposition isolates latent structural components to reveal how much of the series' movement is driven by secular growth, predictable recurring cycles, or random shocks."
-          formula={decompModel === 'additive' ? "Observed_t = Trend_t + Seasonal_t + Residual_t" : decompModel === 'multiplicative' ? "Observed_t = Trend_t × Seasonal_t × Residual_t" : "Observed_t = Trend(LOESS)_t + Seasonal(LOESS)_t + Residual_t"}
-          items={[
-            {
-              badge: "1. Observed",
-              badgeColor: "blue",
-              label: "Composite Series",
-              text: "The raw empirical time series containing all combined trend, seasonal, and stochastic forces."
-            },
-            {
-              badge: "2. Trend",
-              badgeColor: "emerald",
-              label: "Secular Direction",
-              text: "The smooth long-term trajectory isolated by filtering out seasonal cycles. Shows underlying expansion or contraction."
-            },
-            {
-              badge: "3. Seasonal",
-              badgeColor: "amber",
-              label: "Periodic Recurrence",
-              text: `Oscillations that repeat exactly every ${decompPeriod} timestamps. If amplitude grows over time, Multiplicative model is preferred over Additive.`
-            },
-            {
-              badge: "4. Residual",
-              badgeColor: "rose",
-              label: "Stochastic Noise (e_t)",
-              text: "The irregular noise left after subtracting trend and seasonal components. A good decomposition leaves purely random white noise."
-            }
-          ]}
-          takeaway="If the Residual panel displays visible sinusoidal waves or a sloped drift, the chosen seasonal period or model type is misspecified. Residuals should look like unstructured white noise."
-        />
-      </div>
-
-      {/* Lag Plots */}
-      {lagsData && (
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-          <h2 className="text-base font-semibold text-white mb-1">Lag Phase Analysis (Y_t vs Y_{'t-k'})</h2>
-          <p className="text-xs text-slate-400 mb-4">Pairwise phase scatter plots evaluating linear and non-linear memory</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {Object.entries(lagsData).map(([lagKey, points]) => (
-              <div key={lagKey} className="bg-slate-900/40 p-3 rounded-lg border border-slate-800/80">
-                <h3 className="text-xs font-semibold text-slate-300 mb-2">Lag k = {lagKey}</h3>
-                <div className="h-44">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ScatterChart>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                      <XAxis type="number" dataKey="x" stroke="#64748b" tick={{ fontSize: 10 }} name={`Y_{t-${lagKey}}`} />
-                      <YAxis type="number" dataKey="y" stroke="#64748b" tick={{ fontSize: 10 }} name="Y_t" />
-                      <Tooltip cursor={{ strokeDasharray: '3 3' }} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
-                      <Scatter data={points} fill="#38bdf8" />
-                    </ScatterChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            ))}
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={seriesPoints} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 10 }} />
+                <YAxis stroke={chartTheme.axis} tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '10px', fontSize: '11px', boxShadow: chartTheme.tooltipShadow }} />
+                <Line type="monotone" dataKey="actual" stroke={chartTheme.actual} strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="rolling" stroke={chartTheme.rolling} strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="std" stroke="#8b5cf6" strokeWidth={1.5} strokeDasharray="3 3" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
 
           <ChartExplanation
-            title="How to Read Lag Phase Scatter Plots"
-            summary="Lag plots graph each observation Y_t against an earlier observation Y_{t-k} to visually diagnose serial dependence, autocorrelation strength, and potential non-linearities."
+            title="Detecting Non-Stationarity via Rolling Dynamics"
+            summary="For a series to be covariance-stationary, its mean and variance must remain constant over time. Rolling statistics provide direct visual verification."
             items={[
               {
-                badge: "Diagonal Ellipse",
-                badgeColor: "cyan",
-                label: "Positive Autocorrelation",
-                text: "Points clustering along a tight 45° upward diagonal indicate strong serial memory: high values today strongly follow high values from k steps ago."
+                badge: "Blue Line",
+                badgeColor: "blue",
+                label: "Raw Observations",
+                text: "The underlying high-frequency series."
               },
               {
-                badge: "Circular Cloud",
-                badgeColor: "slate",
-                label: "Zero Autocorrelation",
-                text: "A random, uniform circular scatter shows that observations k steps apart are mutually uncorrelated (independent innovations)."
-              },
-              {
-                badge: "Ring or Loop",
+                badge: "Amber Line",
                 badgeColor: "amber",
-                label: "Seasonal Cycling",
-                text: "An elliptical ring or periodic pattern reveals deterministic seasonal cycles repeating at lag k."
+                label: "Rolling Mean (μ_w)",
+                text: "If this line wanders upward or downward rather than oscillating around a horizontal axis, the mean is non-stationary."
               },
               {
-                badge: "Curved Parabola",
-                badgeColor: "rose",
-                label: "Non-Linear Dynamics",
-                text: "Non-linear curves reveal non-linear dependencies or regime shifts that standard linear autoregression cannot capture alone."
+                badge: "Purple Dashed",
+                badgeColor: "purple",
+                label: "Rolling Std Dev (σ_w)",
+                text: "If standard deviation fluctuates substantially across time, the process is heteroskedastic. Logarithmic or Box-Cox transformations are recommended."
               }
             ]}
-            takeaway="A tight diagonal cluster at Lag 1 confirms strong short-run persistence, providing visual justification for an Autoregressive AR(1) or ARIMA model."
+            takeaway="Stationary series have flat rolling means and constant standard deviation bounds across the entire timeline."
+          />
+        </div>
+      )}
+
+      {/* Tab 3: Lag Phase Space Analysis */}
+      {activeTab === 'lags' && (
+        <div className={`p-5 rounded-2xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="mb-4">
+            <h2 className="text-sm font-bold text-[var(--text-primary)]">
+              Lag Phase Space Scatter Plots (Y_t vs Y_{'{t-k}'})
+            </h2>
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Visualizes autoregressive correlation and serial dependence across discrete time shifts
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {['1', '2', '7'].map((lagKey) => {
+              const points = lagsData?.[lagKey] || [];
+              return (
+                <div key={lagKey} className={`p-3.5 rounded-xl border ${isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'}`}>
+                  <span className="text-xs font-semibold text-[var(--text-primary)]">
+                    Lag k = {lagKey} ({lagKey === '1' ? 'Immediate predecessor' : lagKey === '7' ? 'Weekly cycle' : 'Secondary lag'})
+                  </span>
+                  <div className="h-52 w-full mt-2">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <ScatterChart margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                        <XAxis type="number" dataKey="x" name={`Y_{t-${lagKey}}`} stroke={chartTheme.axis} tick={{ fontSize: 9 }} domain={['auto', 'auto']} />
+                        <YAxis type="number" dataKey="y" name="Y_t" stroke={chartTheme.axis} tick={{ fontSize: 9 }} domain={['auto', 'auto']} />
+                        <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '8px', fontSize: '10px' }} />
+                        <Scatter data={points} fill={chartTheme.actual} opacity={0.6} />
+                      </ScatterChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <ChartExplanation
+            title="Interpreting Phase Space Geometry"
+            summary="Phase scatter plots map observations against their predecessors. The tighter and narrower the cluster along the 45-degree diagonal, the stronger the serial dependence."
+            items={[
+              {
+                badge: "Tight Diagonal",
+                badgeColor: "emerald",
+                label: "High Autocorrelation",
+                text: "Points clustered tightly along a 45° angle indicate strong positive autoregression (e.g. AR(1) with high φ)."
+              },
+              {
+                badge: "Spherical Cloud",
+                badgeColor: "blue",
+                label: "White Noise",
+                text: "A dispersed circular cloud indicates zero serial correlation; past values provide zero predictive power."
+              }
+            ]}
+            takeaway="A narrow oval cluster at lag 1 confirms the rationale for fitting an Autoregressive AR(1) model."
           />
         </div>
       )}

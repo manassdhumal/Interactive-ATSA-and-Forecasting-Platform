@@ -1,16 +1,18 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
 import { ModelFitResult } from '../types';
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, AreaChart, Area
+  XAxis, YAxis, Tooltip, ResponsiveContainer,
+  CartesianGrid, AreaChart, Area, Line
 } from 'recharts';
-import { Compass, Download, Play, Calendar, Layers } from 'lucide-react';
+import { Download, Play } from 'lucide-react';
 import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const ForecastPage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
+  const { isDark, chartTheme } = useTheme();
   const [modelType, setModelType] = useState('sarima');
   const [horizon, setHorizon] = useState(24);
   const [confidenceLevel, setConfidenceLevel] = useState(0.95);
@@ -85,23 +87,29 @@ export const ForecastPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Forecast Explorer</h1>
-        <p className="text-sm text-slate-400">
-          Dedicated out-of-sample forward horizon visualizer with prediction confidence intervals
+        <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
+          Forecast Horizon Explorer
+        </h1>
+        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+          Dedicated out-of-sample forward horizon visualizer with probability prediction intervals
         </p>
       </div>
 
       {/* Configuration Bar */}
-      <div className="bg-[#101728] border border-slate-800 rounded-xl p-5 flex flex-wrap items-center justify-between gap-4">
+      <div className={`p-5 rounded-2xl border flex flex-wrap items-center justify-between gap-4 transition ${
+        isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+      }`}>
         <div className="flex flex-wrap items-center gap-4 text-xs">
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Model Architecture:</span>
+            <span className="text-[var(--text-tertiary)] font-medium">Model:</span>
             <select
               value={modelType}
               onChange={(e) => setModelType(e.target.value)}
-              className="bg-slate-900 border border-slate-700 rounded px-3 py-1.5 text-slate-200"
+              className={`border rounded-lg px-2.5 py-1.5 text-xs ${
+                isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+              }`}
             >
-              <option value="sarima">SARIMA (Seasonal ARIMA)</option>
+              <option value="sarima">SARIMA (Seasonal Multiplicative)</option>
               <option value="arima">ARIMA(p, d, q)</option>
               <option value="arma">ARMA(p, q)</option>
               <option value="holt_winters">Holt-Winters Exponential Smoothing</option>
@@ -115,27 +123,31 @@ export const ForecastPage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Forward Horizon (steps):</span>
+            <span className="text-[var(--text-tertiary)] font-medium">Horizon:</span>
             <input
               type="number"
               min="1"
               max="120"
               value={horizon}
               onChange={(e) => setHorizon(Number(e.target.value))}
-              className="w-16 bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-slate-200 font-mono"
+              className={`w-16 border rounded-lg px-2 py-1 font-mono text-xs ${
+                isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+              }`}
             />
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-slate-400 font-medium">Confidence Interval:</span>
+            <span className="text-[var(--text-tertiary)] font-medium">Confidence:</span>
             <select
               value={confidenceLevel}
               onChange={(e) => setConfidenceLevel(Number(e.target.value))}
-              className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1.5 text-slate-200"
+              className={`border rounded-lg px-2.5 py-1.5 text-xs ${
+                isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+              }`}
             >
-              <option value={0.90}>90% Confidence Interval</option>
-              <option value={0.95}>95% Confidence Interval</option>
-              <option value={0.99}>99% Confidence Interval</option>
+              <option value={0.90}>90% Interval</option>
+              <option value={0.95}>95% Interval</option>
+              <option value={0.99}>99% Interval</option>
             </select>
           </div>
         </div>
@@ -143,52 +155,69 @@ export const ForecastPage: React.FC = () => {
         <button
           onClick={handleGenerateForecast}
           disabled={loading}
-          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium shadow-md shadow-blue-600/20 flex items-center gap-2 disabled:opacity-50"
+          className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
         >
           <Play className="w-3.5 h-3.5 fill-current" />
-          {loading ? 'Forecasting...' : 'Compute Forward Forecast'}
+          {loading ? 'Forecasting...' : 'Compute Forecast'}
         </button>
       </div>
 
       {/* Forecast Chart */}
       {fitResult && (
         <div className="space-y-6">
-          <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-            <div className="flex items-center justify-between mb-4">
+          <div className={`p-5 rounded-2xl border transition ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
               <div>
-                <h2 className="text-base font-semibold text-white">Out-of-Sample Prediction Trajectory</h2>
-                <p className="text-xs text-slate-400">
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">
+                  Out-of-Sample Prediction Trajectory
+                </h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                   Forecast horizon: {horizon} steps ahead with {(confidenceLevel * 100).toFixed(0)}% confidence bounds
                 </p>
               </div>
-              <div className="flex items-center gap-4 text-xs">
-                <span className="flex items-center gap-1.5 text-blue-400">
-                  <span className="w-3 h-0.5 bg-blue-500 rounded"></span> Historical
+              <div className="flex items-center gap-3 text-xs font-medium">
+                <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                  <span className="w-2.5 h-1 bg-blue-500 rounded-full"></span> Historical
                 </span>
-                <span className="flex items-center gap-1.5 text-rose-400">
-                  <span className="w-3 h-0.5 bg-rose-500 rounded"></span> Forecast
+                <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                  <span className="w-2.5 h-1 bg-rose-500 rounded-full"></span> Forecast
                 </span>
                 <a
                   href={apiService.getForecastCsvUrl(fitResult.analysis_id)}
                   download
-                  className="flex items-center gap-1 px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-mono"
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-mono ml-2 transition ${
+                    isDark
+                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
                 >
-                  <Download className="w-3.5 h-3.5" />
-                  Export Forecast CSV
+                  <Download className="w-3 h-3" />
+                  CSV
                 </a>
               </div>
             </div>
 
             <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData()}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 11 }} />
-                  <YAxis stroke="#64748b" tick={{ fontSize: 11 }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="upper" stroke="none" fill="#38bdf8" fillOpacity={0.15} />
-                  <Area type="monotone" dataKey="lower" stroke="none" fill="#38bdf8" fillOpacity={0.15} />
-                  <Line type="monotone" dataKey="actual" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                <AreaChart data={chartData()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                  <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 10 }} />
+                  <YAxis stroke={chartTheme.axis} tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: chartTheme.tooltipBg,
+                      borderColor: chartTheme.tooltipBorder,
+                      color: chartTheme.tooltipText,
+                      borderRadius: '10px',
+                      fontSize: '11px',
+                      boxShadow: chartTheme.tooltipShadow
+                    }}
+                  />
+                  <Area type="monotone" dataKey="upper" stroke="none" fill={chartTheme.confidenceFill} />
+                  <Area type="monotone" dataKey="lower" stroke="none" fill={chartTheme.confidenceFill} />
+                  <Line type="monotone" dataKey="actual" stroke={chartTheme.actual} strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="forecast" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -221,35 +250,39 @@ export const ForecastPage: React.FC = () => {
                   badge: "Expanding Width",
                   badgeColor: "amber",
                   label: "Compounding Uncertainty",
-                  text: "Notice that the confidence envelope fans out wider as you look further ahead, mathematically reflecting error compounding over long horizons."
+                  text: "Notice that the confidence envelope fans out wider further ahead, reflecting error compounding over long horizons."
                 }
               ]}
-              takeaway="The red line represents the most likely central path, but real outcomes can fall anywhere within the shaded cone. Always account for the uncertainty band when making operational decisions."
+              takeaway="The red line represents the most likely central path, but real outcomes can fall anywhere within the shaded cone. Always account for the uncertainty band when making decisions."
             />
           </div>
 
           {/* Forecast Predictions Table */}
-          <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-            <h2 className="text-base font-semibold text-white mb-3">Predicted Timestamp Values</h2>
-            <div className="overflow-x-auto max-h-64 border border-slate-800 rounded-lg">
+          <div className={`p-5 rounded-2xl border transition ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <h2 className="text-sm font-bold text-[var(--text-primary)] mb-3">Predicted Timestamp Values</h2>
+            <div className="overflow-x-auto max-h-64 border rounded-xl border-[var(--border-subtle)]">
               <table className="w-full text-left text-xs font-mono">
-                <thead className="bg-slate-900 sticky top-0 text-[11px] uppercase tracking-wider text-slate-400 font-sans">
+                <thead className={`sticky top-0 text-[10px] uppercase tracking-wider font-semibold font-sans ${
+                  isDark ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-600'
+                }`}>
                   <tr>
                     <th className="p-3">Step</th>
                     <th className="p-3">Timestamp</th>
-                    <th className="p-3">Predicted Value</th>
+                    <th className="p-3">Forecast Value</th>
                     <th className="p-3">Lower Bound ({confidenceLevel * 100}%)</th>
                     <th className="p-3">Upper Bound ({confidenceLevel * 100}%)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-[var(--border-subtle)] text-[11px]">
                   {fitResult.forecast_timestamps.map((t, idx) => (
-                    <tr key={idx} className="hover:bg-slate-800/30">
-                      <td className="p-3 text-slate-400">+{idx + 1}</td>
-                      <td className="p-3 text-white">{t}</td>
-                      <td className="p-3 text-cyan-400 font-bold">{fitResult.forecast[idx]?.toFixed(4)}</td>
-                      <td className="p-3 text-slate-300">{fitResult.lower_interval[idx]?.toFixed(4) ?? '—'}</td>
-                      <td className="p-3 text-slate-300">{fitResult.upper_interval[idx]?.toFixed(4) ?? '—'}</td>
+                    <tr key={idx} className={isDark ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}>
+                      <td className="p-3 text-[var(--text-tertiary)]">+{idx + 1}</td>
+                      <td className="p-3 text-[var(--text-primary)] font-sans">{t}</td>
+                      <td className="p-3 text-blue-600 dark:text-cyan-400 font-bold">{fitResult.forecast[idx]?.toFixed(4)}</td>
+                      <td className="p-3 text-[var(--text-secondary)]">{fitResult.lower_interval[idx]?.toFixed(4) ?? '—'}</td>
+                      <td className="p-3 text-[var(--text-secondary)]">{fitResult.upper_interval[idx]?.toFixed(4) ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
 import {
   Upload, Download, CheckCircle, AlertTriangle,
-  Sparkles, ArrowRight, ShieldCheck, Activity, Zap, Trash2, Globe
+  Sparkles, Globe, Trash2, Zap, X
 } from 'lucide-react';
 
 export const DatasetsPage: React.FC = () => {
   const { datasets, selectedDataset, selectedTarget, setSelectedDataset, refreshDatasets } = useApp();
+  const { isDark } = useTheme();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<{ columns: string[]; rows: any[]; total_rows: number } | null>(null);
@@ -33,7 +35,6 @@ export const DatasetsPage: React.FC = () => {
   } | null>(null);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
-  // Fetch intelligent suggestions whenever active dataset or target column changes
   useEffect(() => {
     if (selectedDataset && selectedTarget) {
       setLoadingSuggestions(true);
@@ -118,38 +119,57 @@ export const DatasetsPage: React.FC = () => {
       if (selectedDataset?.id === datasetId) {
         setSelectedDataset(null);
       }
-    } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to delete dataset');
+    } catch (err) {
+      console.error(err);
     }
   };
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Data Management & Ingestion</h1>
-        <p className="text-sm text-slate-400">
-          Upload custom CSV/Excel time series, review automated statistical suggestions, or select synthetic ATSA benchmarks
+        <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
+          Data Hub & Time Series Ingestion
+        </h1>
+        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+          Upload custom CSV/Excel files, fetch live Yahoo Finance ticker series, and apply statistical cleaning
         </p>
       </div>
 
-      {/* Data Ingestion: Upload File OR Fetch Public Market Ticker */}
+      {/* Clean Ingestion Cards (Upload + Market Ticker) */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Upload Box */}
-        <div className="bg-[#101728] border-2 border-dashed border-slate-700/80 hover:border-blue-500/60 rounded-xl p-6 text-center transition flex flex-col justify-between">
-          <div>
-            <Upload className="w-8 h-8 text-blue-400 mx-auto mb-2" />
-            <h3 className="text-sm font-semibold text-white">Upload Local File</h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-              Supports CSV (.csv) and Excel (.xlsx, .xls) files. Automatically parses timestamps and numeric target series.
-            </p>
+        <div className={`p-5 rounded-2xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Upload className="w-4 h-4 text-emerald-500" />
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Upload Time Series File</h3>
           </div>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            Upload CSV or Excel files with a chronological date/timestamp column and numeric value series.
+          </p>
+
           <div className="mt-4">
-            <label className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium cursor-pointer shadow-md shadow-blue-600/20 transition">
-              <input type="file" accept=".csv,.xlsx,.xls" onChange={handleFileUpload} className="hidden" />
-              {uploading ? 'Processing & Validating...' : 'Select File from Device'}
+            <label className={`border-2 border-dashed rounded-xl p-5 flex flex-col items-center justify-center cursor-pointer transition ${
+              isDark
+                ? 'border-slate-800 hover:border-slate-700 bg-slate-950/30'
+                : 'border-slate-200 hover:border-slate-300 bg-slate-50/50'
+            }`}>
+              <Upload className="w-5 h-5 text-[var(--text-tertiary)] mb-2" />
+              <span className="text-xs font-semibold text-[var(--text-primary)]">
+                {uploading ? 'Processing & validating timestamps...' : 'Click to select CSV or Excel (.xlsx)'}
+              </span>
+              <span className="text-[10px] text-[var(--text-tertiary)] mt-0.5">Auto-infers frequency and regularity</span>
+              <input
+                type="file"
+                accept=".csv, .xlsx, .xls"
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="hidden"
+              />
             </label>
             {uploadError && (
-              <div className="mt-3 text-xs text-rose-400 flex items-center justify-center gap-1.5">
+              <div className="mt-2 text-xs text-rose-500 flex items-center justify-center gap-1.5">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 {uploadError}
               </div>
@@ -158,28 +178,34 @@ export const DatasetsPage: React.FC = () => {
         </div>
 
         {/* Live Public Web & Financial Market API Fetch Box */}
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-6 flex flex-col justify-between">
+        <div className={`p-5 rounded-2xl border flex flex-col justify-between transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <Globe className="w-5 h-5 text-cyan-400" />
-              <h3 className="text-sm font-semibold text-white">Direct Web & Market API Fetch</h3>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Globe className="w-4 h-4 text-cyan-500" />
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">Fetch Public Market Data</h3>
             </div>
-            <p className="text-xs text-slate-400">
-              Fetch real-world time-series data directly from public financial markets (Yahoo Finance) by symbol (e.g., AAPL, NVDA, TSLA, BTC-USD, ^GSPC).
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Fetch real-world time-series directly from public markets by ticker symbol (e.g. AAPL, NVDA, TSLA, BTC-USD, ^GSPC).
             </p>
 
             <div className="mt-4 flex items-center gap-2">
               <input
                 type="text"
-                placeholder="Ticker symbol (e.g. AAPL, BTC-USD)"
+                placeholder="Ticker (e.g. AAPL, BTC-USD)"
                 value={tickerInput}
                 onChange={(e) => setTickerInput(e.target.value)}
-                className="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-mono focus:outline-none focus:border-cyan-500 uppercase"
+                className={`flex-1 border rounded-lg px-3 py-2 text-xs font-mono uppercase focus:outline-none focus:ring-1 focus:ring-blue-500 ${
+                  isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                }`}
               />
               <select
                 value={tickerPeriod}
                 onChange={(e) => setTickerPeriod(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-slate-200"
+                className={`border rounded-lg px-2.5 py-2 text-xs ${
+                  isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                }`}
               >
                 <option value="6mo">6 Months</option>
                 <option value="1y">1 Year</option>
@@ -190,98 +216,100 @@ export const DatasetsPage: React.FC = () => {
           </div>
 
           <div className="mt-4 flex items-center justify-between">
-            <span className="text-[11px] text-slate-400">Daily closes adjusted for splits & dividends</span>
+            <span className="text-[10px] text-[var(--text-tertiary)]">Adjusted daily closing prices</span>
             <button
               onClick={handleFetchTicker}
               disabled={fetchingTicker || !tickerInput.trim()}
-              className="px-4 py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium shadow-md shadow-cyan-600/20 disabled:opacity-50 transition"
+              className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs disabled:opacity-50 transition cursor-pointer"
             >
-              {fetchingTicker ? 'Fetching Market Data...' : 'Import Time Series'}
+              {fetchingTicker ? 'Fetching...' : 'Import Series'}
             </button>
           </div>
         </div>
       </div>
 
-      {/* INTELLIGENT SUGGESTIONS & AUTO-RECOMMENDATIONS */}
+      {/* Auto-Recommendations Panel */}
       {selectedDataset && (
-        <div className="bg-gradient-to-br from-[#10192e] to-[#0c1322] border border-blue-500/40 rounded-xl p-5 shadow-lg shadow-blue-500/5">
-          <div className="flex items-center justify-between mb-3">
+        <div className={`p-5 rounded-2xl border transition ${
+          isDark
+            ? 'bg-gradient-to-r from-blue-950/20 to-slate-900/40 border-blue-500/30'
+            : 'bg-blue-50/40 border-blue-200/80 shadow-xs'
+        }`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-400">
-                <Sparkles className="w-4 h-4" />
-              </div>
+              <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
               <div>
-                <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">
                   Dataset Diagnostics & Preprocessing Recommendations
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-500/30">
-                    Auto-Detected
-                  </span>
                 </h2>
-                <p className="text-xs text-slate-400">
-                  Data-driven statistical recommendations based on unit-root tests, skewness, dispersion, and autocorrelation
+                <p className="text-xs text-[var(--text-secondary)]">
+                  Statistical suggestions based on unit-root tests, skewness, dispersion, and autocorrelation
                 </p>
               </div>
             </div>
             {suggestionsData?.profile && (
-              <div className="hidden md:flex items-center gap-3 text-xs font-mono text-slate-400">
+              <div className="flex items-center gap-2.5 text-[11px] font-mono text-[var(--text-tertiary)]">
                 <span>Obs: {suggestionsData.profile.total_observations}</span>
-                <span>Missing: {suggestionsData.profile.missing_count} ({suggestionsData.profile.missing_percentage}%)</span>
-                <span>Positive: {suggestionsData.profile.is_positive ? 'Yes' : 'No'}</span>
+                <span>Missing: {suggestionsData.profile.missing_count}</span>
               </div>
             )}
           </div>
 
           {loadingSuggestions ? (
-            <div className="p-6 text-center text-xs text-slate-400">
-              Analyzing series structure and computing diagnostic stationarity...
+            <div className="py-4 text-center text-xs text-[var(--text-tertiary)]">
+              Analyzing series structure...
             </div>
           ) : suggestionsData && suggestionsData.suggestions.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
               {suggestionsData.suggestions.map((sug, idx) => {
                 const isHigh = sug.priority === 'high';
                 const isInfo = sug.priority === 'info';
                 return (
                   <div
                     key={idx}
-                    className={`p-4 rounded-xl border flex flex-col justify-between transition-all ${
-                      isHigh
-                        ? 'bg-amber-950/20 border-amber-500/40'
+                    className={`p-3.5 rounded-xl border flex flex-col justify-between transition ${
+                      isDark
+                        ? isHigh
+                          ? 'bg-amber-950/20 border-amber-500/30'
+                          : isInfo
+                          ? 'bg-emerald-950/20 border-emerald-500/30'
+                          : 'bg-slate-900/60 border-slate-800'
+                        : isHigh
+                        ? 'bg-amber-50/80 border-amber-200'
                         : isInfo
-                        ? 'bg-emerald-950/20 border-emerald-500/40'
-                        : 'bg-slate-900/60 border-slate-800'
+                        ? 'bg-emerald-50/80 border-emerald-200'
+                        : 'bg-white border-slate-200/90'
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded ${
-                          isHigh
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            : isInfo
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                        }`}>
-                          {sug.priority === 'high' ? 'Recommended Action' : sug.priority === 'info' ? 'Verified Status' : 'Optimization Suggestion'}
-                        </span>
-                      </div>
-                      <h3 className="text-sm font-semibold text-white mt-1">{sug.title}</h3>
-                      <p className="text-xs text-slate-300 mt-1.5 leading-relaxed">
+                      <span className={`text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded ${
+                        isHigh
+                          ? isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-800'
+                          : isInfo
+                          ? isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-800'
+                          : isDark ? 'bg-blue-500/20 text-blue-300' : 'bg-blue-100 text-blue-800'
+                      }`}>
+                        {isHigh ? 'Recommended' : isInfo ? 'Verified' : 'Optimization'}
+                      </span>
+                      <h4 className="text-xs font-bold text-[var(--text-primary)] mt-1.5">{sug.title}</h4>
+                      <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
                         {sug.reason}
                       </p>
                     </div>
 
-                    <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between">
+                    <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between">
                       {sug.action !== 'already_stationary' && sug.action !== 'none' ? (
                         <button
                           onClick={() => handlePreprocess(sug.action, sug.params)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium shadow-md shadow-blue-600/20 transition"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
                         >
                           <Zap className="w-3.5 h-3.5 fill-current" />
                           {sug.button_label}
                         </button>
                       ) : (
-                        <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
+                        <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                           <CheckCircle className="w-4 h-4" />
-                          <span>Ready for Model Fitting</span>
+                          <span>Ready for Modeling</span>
                         </div>
                       )}
                     </div>
@@ -290,45 +318,46 @@ export const DatasetsPage: React.FC = () => {
               })}
             </div>
           ) : (
-            <div className="p-4 text-center text-xs text-slate-400">
-              No anomalies detected. The series is ready for time-series modeling.
+            <div className="py-2 text-xs text-[var(--text-secondary)]">
+              No anomalies detected. Series is ready for time-series modeling.
             </div>
           )}
         </div>
       )}
 
-      {/* Manual Preprocessing Tools Panel */}
+      {/* Manual Cleaning Toolbar */}
       {selectedDataset && (
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-          <h2 className="text-base font-semibold text-white mb-1">Manual Transformation & Cleaning Controls</h2>
-          <p className="text-xs text-slate-400 mb-4">
-            Select a custom transformation to apply to the active series:
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3">
+        <div className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-[var(--text-primary)]">Transform Active Series:</span>
             <select
               value={preprocessAction}
               onChange={(e) => setPreprocessAction(e.target.value)}
-              className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200"
+              className={`border rounded-lg px-2.5 py-1 text-xs ${
+                isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+              }`}
             >
-              <option value="interpolate">Linear Interpolation (Fill NaNs)</option>
-              <option value="drop_na">Drop Missing Values</option>
+              <option value="interpolate">Linear Interpolation</option>
+              <option value="drop_na">Drop Missing</option>
               <option value="diff">First-Order Differencing (d=1)</option>
-              <option value="seasonal_diff">Seasonal Differencing (Period=12)</option>
-              <option value="log">Logarithmic Transformation (Y &gt; 0)</option>
+              <option value="seasonal_diff">Seasonal Diff (s=12)</option>
+              <option value="log">Logarithmic Transformation</option>
               <option value="ffill">Forward Fill</option>
               <option value="bfill">Backward Fill</option>
             </select>
+          </div>
 
+          <div className="flex items-center gap-3">
             <button
               onClick={() => handlePreprocess()}
-              className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition"
+              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold shadow-xs transition cursor-pointer"
             >
-              Apply Manual Transformation
+              Apply Transformation
             </button>
-
             {preprocessResult && (
-              <span className="text-xs text-emerald-400 font-mono">
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 font-mono">
                 ✓ {preprocessResult}
               </span>
             )}
@@ -343,27 +372,33 @@ export const DatasetsPage: React.FC = () => {
           return (
             <div
               key={d.id}
-              className={`p-4 rounded-xl border transition-all ${
+              className={`p-4 rounded-xl border transition ${
                 isSelected
-                  ? 'bg-blue-950/20 border-blue-500/60 shadow-lg shadow-blue-500/5'
-                  : 'bg-[#101728] border-slate-800 hover:border-slate-700'
+                  ? isDark
+                    ? 'bg-blue-950/20 border-blue-500/50 shadow-md'
+                    : 'bg-blue-50/50 border-blue-300 shadow-xs'
+                  : isDark
+                  ? 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
+                  : 'bg-white border-slate-200/90 hover:border-slate-300 shadow-xs'
               }`}
             >
               <div className="flex items-start justify-between">
                 <div>
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${
-                    d.is_sample ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded font-medium ${
+                    d.is_sample
+                      ? isDark ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                      : isDark ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                   }`}>
-                    {d.is_sample ? 'Synthetic Benchmark' : 'Uploaded'}
+                    {d.is_sample ? 'Benchmark' : 'Uploaded'}
                   </span>
-                  <h3 className="text-sm font-semibold text-white mt-1.5">{d.name}</h3>
+                  <h3 className="text-xs font-bold text-[var(--text-primary)] mt-1.5">{d.name}</h3>
                 </div>
-                {isSelected && <CheckCircle className="w-4 h-4 text-blue-400 shrink-0" />}
+                {isSelected && <CheckCircle className="w-4 h-4 text-blue-500 shrink-0" />}
               </div>
 
-              <p className="text-xs text-slate-400 mt-2 line-clamp-2">{d.description}</p>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-1.5 line-clamp-2 leading-relaxed">{d.description}</p>
 
-              <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <div className="mt-3 pt-2.5 border-t border-[var(--border-subtle)] flex items-center justify-between text-[11px] text-[var(--text-tertiary)] font-mono">
                 <span>{d.total_rows} rows</span>
                 <span>Target: {d.target_col}</span>
               </div>
@@ -371,31 +406,45 @@ export const DatasetsPage: React.FC = () => {
               <div className="mt-3 flex items-center gap-2">
                 <button
                   onClick={() => setSelectedDataset(d)}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition ${
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                     isSelected
-                      ? 'bg-blue-600 text-white font-semibold'
-                      : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                      ? 'bg-blue-600 text-white'
+                      : isDark
+                      ? 'bg-slate-800 hover:bg-slate-700 text-slate-200'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-800'
                   }`}
                 >
-                  {isSelected ? 'Active Dataset' : 'Select'}
+                  {isSelected ? 'Active' : 'Select'}
                 </button>
                 <button
                   onClick={() => loadPreview(d.id)}
-                  className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-xs font-medium"
+                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-medium transition cursor-pointer ${
+                    isDark
+                      ? 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
                 >
                   Preview
                 </button>
                 <a
                   href={apiService.getDownloadUrl(d.id)}
                   download
-                  className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white"
+                  className={`p-1.5 rounded-lg border transition ${
+                    isDark
+                      ? 'bg-slate-800/80 hover:bg-slate-700 text-slate-300 border-slate-700'
+                      : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                  }`}
                   title="Download CSV"
                 >
                   <Download className="w-3.5 h-3.5" />
                 </a>
                 <button
                   onClick={() => handleDeleteDataset(d.id, d.name)}
-                  className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-rose-950/60 text-slate-400 hover:text-rose-400 border border-transparent hover:border-rose-500/30 transition"
+                  className={`p-1.5 rounded-lg border transition cursor-pointer ${
+                    isDark
+                      ? 'bg-slate-800/80 hover:bg-rose-950/50 text-slate-400 hover:text-rose-400 border-slate-700 hover:border-rose-500/30'
+                      : 'bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border-slate-200 hover:border-rose-200'
+                  }`}
                   title="Delete Dataset"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -408,24 +457,36 @@ export const DatasetsPage: React.FC = () => {
 
       {/* Data Preview Table */}
       {previewData && (
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
+        <div className={`p-5 rounded-2xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-base font-semibold text-white">Dataset Preview (First 25 observations)</h2>
-            <span className="text-xs text-slate-400">Total Observations: {previewData.total_rows}</span>
+            <div>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">Dataset Preview (First 25 observations)</h3>
+              <span className="text-xs text-[var(--text-tertiary)]">Total Observations: {previewData.total_rows}</span>
+            </div>
+            <button
+              onClick={() => setPreviewData(null)}
+              className="p-1 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 text-[var(--text-tertiary)]"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          <div className="overflow-x-auto max-h-72 border border-slate-800 rounded-lg">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-900 sticky top-0 text-[11px] uppercase tracking-wider text-slate-400">
+          <div className="overflow-x-auto max-h-72 border rounded-xl border-[var(--border-subtle)]">
+            <table className="w-full text-left text-xs">
+              <thead className={`sticky top-0 text-[10px] uppercase tracking-wider font-semibold ${
+                isDark ? 'bg-slate-900 text-slate-400' : 'bg-slate-100 text-slate-600'
+              }`}>
                 <tr>
                   {previewData.columns.map(col => (
-                    <th key={col} className="p-2.5 font-semibold">{col}</th>
+                    <th key={col} className="p-2.5">{col}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
+              <tbody className="divide-y divide-[var(--border-subtle)] font-mono text-[11px] text-[var(--text-secondary)]">
                 {previewData.rows.map((row, idx) => (
-                  <tr key={idx} className="hover:bg-slate-800/30">
+                  <tr key={idx} className={isDark ? 'hover:bg-slate-800/30' : 'hover:bg-slate-50'}>
                     {previewData.columns.map(col => (
                       <td key={col} className="p-2.5 whitespace-nowrap">{row[col]}</td>
                     ))}

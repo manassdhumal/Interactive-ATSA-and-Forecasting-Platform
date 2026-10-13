@@ -1,20 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
 import { DescriptiveStats, RollingTrendData } from '../types';
 import { Link } from 'react-router-dom';
 import {
-  Activity, TrendingUp, Calendar, AlertCircle, Database,
-  ArrowRight, ShieldCheck, Cpu, GitCompare, BarChart2, Sparkles, Zap
+  Activity, TrendingUp, Database, ArrowRight,
+  GitCompare, BarChart2, Sparkles
 } from 'lucide-react';
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, Area, AreaChart
 } from 'recharts';
 import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const DashboardPage: React.FC = () => {
   const { selectedDataset, selectedTarget, datasets } = useApp();
+  const { isDark, chartTheme } = useTheme();
   const [stats, setStats] = useState<DescriptiveStats | null>(null);
   const [plotData, setPlotData] = useState<RollingTrendData | null>(null);
   const [loading, setLoading] = useState(false);
@@ -47,35 +49,47 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Hero Welcome & Actions Header */}
-      <div className="relative overflow-hidden rounded-2xl p-6 glass-panel border border-white/10 shadow-2xl bg-gradient-to-r from-blue-950/40 via-indigo-950/20 to-slate-900/60">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Minimalist Top Banner */}
+      <div className={`p-6 rounded-2xl border transition-all ${
+        isDark
+          ? 'bg-slate-900/60 border-slate-800/80 shadow-md'
+          : 'bg-white border-slate-200/90 shadow-xs'
+      }`}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono uppercase tracking-wider flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-cyan-400" />
-                Autonomous ATSA Engine
+            <div className="flex items-center gap-2 mb-1.5">
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full font-mono uppercase tracking-wider flex items-center gap-1 ${
+                isDark
+                  ? 'bg-blue-500/10 text-cyan-300 border border-blue-500/20'
+                  : 'bg-blue-50 text-blue-700 border border-blue-200'
+              }`}>
+                <Sparkles className="w-3 h-3 text-blue-500" />
+                ATSA Statistical Engine
               </span>
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight text-white">
-              Analytical Time Series & Forecasting Workbench
+            <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
+              Time Series Analysis & Forecasting Workbench
             </h1>
-            <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
-              Real-time statistical estimation, unit-root hypothesis testing, decomposition, and model benchmarking on genuine Python statsmodels computations.
+            <p className="text-xs text-[var(--text-secondary)] mt-1 max-w-xl leading-relaxed">
+              Real-time statistical estimation, unit-root hypothesis testing, classical decomposition, and out-of-sample model evaluation.
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 shrink-0">
             <Link
               to="/datasets"
-              className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 text-slate-200 text-xs font-semibold border border-slate-700/80 shadow-md transition"
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold border transition ${
+                isDark
+                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 shadow-xs'
+              }`}
             >
-              <Database className="w-3.5 h-3.5 text-emerald-400" />
-              Ingest Data / Ticker
+              <Database className="w-3.5 h-3.5 text-emerald-500" />
+              Manage Data
             </Link>
             <Link
               to="/model-comparison"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-semibold shadow-lg shadow-blue-600/30 transition"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-xs transition"
             >
               <GitCompare className="w-3.5 h-3.5" />
               Compare Models
@@ -84,123 +98,125 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* Clean KPI Cards Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass-panel glass-panel-hover rounded-2xl p-4.5 border border-white/5 relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Datasets in Library</span>
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <Database className="w-4 h-4" />
-            </div>
+        <div className={`p-4 rounded-xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between text-[var(--text-tertiary)] text-xs font-medium">
+            <span>Datasets in Hub</span>
+            <Database className="w-4 h-4 text-emerald-500" />
           </div>
-          <div className="mt-2 text-2xl font-extrabold text-white font-mono">{datasets.length}</div>
-          <div className="mt-1 text-[11px] text-slate-400">Benchmarks & Market Feeds</div>
+          <div className="mt-2 text-2xl font-bold font-mono text-[var(--text-primary)]">{datasets.length}</div>
+          <div className="mt-1 text-[11px] text-[var(--text-tertiary)] truncate">Library & benchmarks</div>
         </div>
 
-        <div className="glass-panel glass-panel-hover rounded-2xl p-4.5 border border-white/5 relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+        <div className={`p-4 rounded-xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between text-[var(--text-tertiary)] text-xs font-medium">
             <span>Series Observations</span>
-            <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
-              <Activity className="w-4 h-4" />
-            </div>
+            <Activity className="w-4 h-4 text-blue-500" />
           </div>
-          <div className="mt-2 text-2xl font-extrabold text-white font-mono">
+          <div className="mt-2 text-2xl font-bold font-mono text-[var(--text-primary)]">
             {stats?.count ?? selectedDataset?.total_rows ?? 0}
           </div>
-          <div className="mt-1 text-[11px] text-slate-400 truncate">
-            Target: <span className="text-cyan-300 font-semibold">{selectedTarget || 'None'}</span>
+          <div className="mt-1 text-[11px] text-[var(--text-tertiary)] truncate">
+            Target: <span className="font-semibold text-blue-600 dark:text-cyan-400">{selectedTarget || 'None'}</span>
           </div>
         </div>
 
-        <div className="glass-panel glass-panel-hover rounded-2xl p-4.5 border border-white/5 relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
+        <div className={`p-4 rounded-xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between text-[var(--text-tertiary)] text-xs font-medium">
             <span>Mean & Dispersion</span>
-            <div className="w-8 h-8 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center text-violet-400">
-              <BarChart2 className="w-4 h-4" />
-            </div>
+            <BarChart2 className="w-4 h-4 text-violet-500" />
           </div>
-          <div className="mt-2 text-xl font-extrabold text-white font-mono">
-            {stats ? `${stats.mean.toFixed(2)}` : '—'}
-            <span className="text-xs text-slate-400 font-normal ml-1.5">
+          <div className="mt-2 text-xl font-bold font-mono text-[var(--text-primary)]">
+            {stats ? stats.mean.toFixed(2) : '—'}
+            <span className="text-xs font-normal text-[var(--text-tertiary)] ml-1">
               (±{stats?.std.toFixed(2)})
             </span>
           </div>
-          <div className="mt-1 text-[11px] text-slate-400 font-mono">
+          <div className="mt-1 text-[11px] font-mono text-[var(--text-tertiary)] truncate">
             [{stats?.min.toFixed(1)} … {stats?.max.toFixed(1)}]
           </div>
         </div>
 
-        <div className="glass-panel glass-panel-hover rounded-2xl p-4.5 border border-white/5 relative overflow-hidden group">
-          <div className="flex items-center justify-between text-slate-400 text-xs font-medium">
-            <span>Estimated Drift</span>
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-              <TrendingUp className="w-4 h-4" />
-            </div>
+        <div className={`p-4 rounded-xl border transition ${
+          isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between text-[var(--text-tertiary)] text-xs font-medium">
+            <span>Estimated Trend</span>
+            <TrendingUp className="w-4 h-4 text-amber-500" />
           </div>
-          <div className="mt-2 text-sm font-bold text-slate-200 truncate">
-            {plotData?.trend_summary?.interpretation || 'Calculating...'}
+          <div className="mt-2 text-sm font-semibold truncate text-[var(--text-primary)]">
+            {plotData?.trend_summary?.interpretation || 'Computing...'}
           </div>
-          <div className="mt-1 text-[11px] text-slate-400 font-mono">
+          <div className="mt-1 text-[11px] font-mono text-[var(--text-tertiary)]">
             R² = {plotData?.trend_summary?.r_squared?.toFixed(3) ?? '0.000'}
           </div>
         </div>
       </div>
 
       {/* Main Trajectory Chart Card */}
-      <div className="glass-panel rounded-2xl p-5 border border-white/5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 mb-4">
+      <div className={`p-5 rounded-2xl border transition ${
+        isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+      }`}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
           <div>
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500"></span>
+            <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-blue-500"></span>
               Active Series Trajectory & Moving Dynamics
             </h2>
-            <p className="text-xs text-slate-400">
-              Observed historical values with 7-period moving average and fitted OLS trend line
+            <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              Historical observations with 7-period moving average and fitted OLS trend line
             </p>
           </div>
-          <div className="flex items-center gap-4 text-xs font-medium">
-            <span className="flex items-center gap-1.5 text-blue-400">
-              <span className="w-3 h-1 bg-blue-500 rounded-full"></span> Actual Series
+          <div className="flex items-center gap-3 text-xs font-medium">
+            <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+              <span className="w-2.5 h-1 bg-blue-500 rounded-full"></span> Actual
             </span>
-            <span className="flex items-center gap-1.5 text-amber-400">
-              <span className="w-3 h-1 bg-amber-500 rounded-full"></span> Rolling (w=7)
+            <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+              <span className="w-2.5 h-1 bg-amber-500 rounded-full"></span> Rolling (w=7)
             </span>
-            <span className="flex items-center gap-1.5 text-emerald-400">
-              <span className="w-3 h-1 bg-emerald-500 border-dashed rounded-full"></span> Trend
+            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+              <span className="w-2.5 h-1 bg-emerald-500 border-dashed rounded-full"></span> Trend
             </span>
           </div>
         </div>
 
         <div className="h-72 w-full">
           {loading ? (
-            <div className="h-full flex items-center justify-center text-slate-400 text-xs font-mono">
-              Computing statistical series trajectory...
+            <div className="h-full flex items-center justify-center text-[var(--text-tertiary)] text-xs font-mono">
+              Computing trajectory...
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartPoints}>
+              <AreaChart data={chartPoints} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="actualGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.0} />
+                    <stop offset="5%" stopColor={chartTheme.actual} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={chartTheme.actual} stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="time" stroke="#64748b" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
+                <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 10 }} />
+                <YAxis stroke={chartTheme.axis} tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                    backdropFilter: 'blur(8px)',
-                    borderColor: 'rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
+                    backgroundColor: chartTheme.tooltipBg,
+                    borderColor: chartTheme.tooltipBorder,
+                    color: chartTheme.tooltipText,
+                    borderRadius: '10px',
                     fontSize: '11px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.5)'
+                    boxShadow: chartTheme.tooltipShadow
                   }}
                 />
-                <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2.5} fillOpacity={1} fill="url(#actualGrad)" dot={false} />
-                <Line type="monotone" dataKey="rolling" stroke="#f59e0b" strokeWidth={1.75} dot={false} />
-                <Line type="monotone" dataKey="trend" stroke="#10b981" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                <Area type="monotone" dataKey="value" stroke={chartTheme.actual} strokeWidth={2} fillOpacity={1} fill="url(#actualGrad)" dot={false} />
+                <Line type="monotone" dataKey="rolling" stroke={chartTheme.rolling} strokeWidth={1.5} dot={false} />
+                <Line type="monotone" dataKey="trend" stroke={chartTheme.trend} strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -239,65 +255,71 @@ export const DashboardPage: React.FC = () => {
         />
       </div>
 
-      {/* Model Quick Access Cards */}
+      {/* Model Quick Access Cards (Minimalist 3-col) */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Link
           to="/models/arma"
-          className="glass-panel glass-panel-hover rounded-2xl p-5 border border-white/5 group transition"
+          className={`p-4.5 rounded-xl border transition group ${
+            isDark
+              ? 'bg-slate-900/40 hover:bg-slate-900/70 border-slate-800'
+              : 'bg-white hover:border-blue-300 border-slate-200/90 shadow-xs'
+          }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-300 border border-blue-500/20 font-bold">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/20">
               ARMA(p, q)
             </span>
-            <div className="w-7 h-7 rounded-full bg-slate-800/80 group-hover:bg-blue-600 flex items-center justify-center text-slate-400 group-hover:text-white transition">
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
-            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-blue-500 group-hover:translate-x-0.5 transition" />
           </div>
-          <h3 className="text-sm font-bold text-white group-hover:text-blue-300 transition">
+          <h3 className="text-xs font-bold text-[var(--text-primary)] group-hover:text-blue-600 transition">
             Autoregressive Moving Average
           </h3>
-          <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-            Stationary stochastic process modeling with statsmodels state-space exact likelihood estimation.
+          <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
+            Stationary stochastic process modeling with statsmodels exact likelihood estimation.
           </p>
         </Link>
 
         <Link
           to="/models/arima"
-          className="glass-panel glass-panel-hover rounded-2xl p-5 border border-white/5 group transition"
+          className={`p-4.5 rounded-xl border transition group ${
+            isDark
+              ? 'bg-slate-900/40 hover:bg-slate-900/70 border-slate-800'
+              : 'bg-white hover:border-cyan-300 border-slate-200/90 shadow-xs'
+          }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 font-bold">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-cyan-500/10 text-cyan-600 dark:text-cyan-300 border border-cyan-500/20">
               ARIMA(p, d, q)
             </span>
-            <div className="w-7 h-7 rounded-full bg-slate-800/80 group-hover:bg-cyan-600 flex items-center justify-center text-slate-400 group-hover:text-white transition">
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
-            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-cyan-500 group-hover:translate-x-0.5 transition" />
           </div>
-          <h3 className="text-sm font-bold text-white group-hover:text-cyan-300 transition">
+          <h3 className="text-xs font-bold text-[var(--text-primary)] group-hover:text-cyan-600 transition">
             Integrated ARIMA & Auto-Search
           </h3>
-          <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-            Handles non-stationary series with order-d differencing and 1-click automated AIC grid search.
+          <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
+            Accommodates non-stationary series with order-d differencing and 1-click AIC grid search.
           </p>
         </Link>
 
         <Link
           to="/models/sarima"
-          className="glass-panel glass-panel-hover rounded-2xl p-5 border border-white/5 group transition"
+          className={`p-4.5 rounded-xl border transition group ${
+            isDark
+              ? 'bg-slate-900/40 hover:bg-slate-900/70 border-slate-800'
+              : 'bg-white hover:border-violet-300 border-slate-200/90 shadow-xs'
+          }`}
         >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-300 border border-violet-500/20 font-bold">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded font-bold bg-violet-500/10 text-violet-600 dark:text-violet-300 border border-violet-500/20">
               SARIMA(p,d,q)(P,D,Q)s
             </span>
-            <div className="w-7 h-7 rounded-full bg-slate-800/80 group-hover:bg-violet-600 flex items-center justify-center text-slate-400 group-hover:text-white transition">
-              <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" />
-            </div>
+            <ArrowRight className="w-3.5 h-3.5 text-[var(--text-tertiary)] group-hover:text-violet-500 group-hover:translate-x-0.5 transition" />
           </div>
-          <h3 className="text-sm font-bold text-white group-hover:text-violet-300 transition">
+          <h3 className="text-xs font-bold text-[var(--text-primary)] group-hover:text-violet-600 transition">
             Seasonal Multiplicative ARIMA
           </h3>
-          <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
-            Multiplicative seasonal lag structure capturing weekly, monthly, and annual cyclical patterns.
+          <p className="text-[11px] text-[var(--text-secondary)] mt-1 leading-relaxed">
+            Captures periodic weekly, monthly, and annual recurrence in seasonality.
           </p>
         </Link>
       </div>

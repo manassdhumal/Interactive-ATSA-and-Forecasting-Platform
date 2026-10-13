@@ -1,74 +1,81 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useTheme } from '../../context/ThemeContext';
 import {
   LayoutDashboard, Database, LineChart, Activity,
   GitCompare, Compass, FileText, ChevronDown, ChevronRight,
-  Cpu, Sparkles
+  Cpu
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
   const [modelsOpen, setModelsOpen] = useState(true);
+  const { isDark } = useTheme();
 
-  const navItemClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-medium transition-all duration-200 ${
-      isActive
-        ? 'bg-gradient-to-r from-blue-600/30 to-indigo-600/10 text-blue-300 border border-blue-500/40 shadow-lg shadow-blue-500/10 font-semibold'
-        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 hover:border hover:border-slate-800'
-    }`;
+  const navItemClass = ({ isActive }: { isActive: boolean }) => {
+    if (isActive) {
+      return isDark
+        ? 'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold bg-blue-600/20 text-blue-300 border border-blue-500/30 shadow-xs'
+        : 'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 shadow-xs';
+    }
+    return isDark
+      ? 'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 transition'
+      : 'flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition';
+  };
 
-  const subNavItemClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-      isActive
-        ? 'text-cyan-300 bg-cyan-950/40 font-semibold border border-cyan-500/30 shadow-sm'
-        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/30'
-    }`;
+  const subNavItemClass = ({ isActive }: { isActive: boolean }) => {
+    if (isActive) {
+      return isDark
+        ? 'flex items-center gap-2 pl-7 pr-3 py-1.5 rounded-lg text-[11px] font-semibold text-cyan-300 bg-cyan-950/40 border border-cyan-500/30'
+        : 'flex items-center gap-2 pl-7 pr-3 py-1.5 rounded-lg text-[11px] font-semibold text-blue-700 bg-blue-50/80 border border-blue-200';
+    }
+    return isDark
+      ? 'flex items-center gap-2 pl-7 pr-3 py-1.5 rounded-lg text-[11px] font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/30 transition'
+      : 'flex items-center gap-2 pl-7 pr-3 py-1.5 rounded-lg text-[11px] font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-100/80 transition';
+  };
 
   return (
-    <aside className="w-64 min-w-[16rem] bg-[#080d19]/80 backdrop-blur-xl border-r border-slate-800/80 flex flex-col h-screen sticky top-0 z-30 shadow-2xl">
+    <aside className="w-60 min-w-[15rem] bg-[var(--bg-sidebar)] border-r border-[var(--border-subtle)] flex flex-col h-screen sticky top-0 z-30 transition-colors duration-200">
       {/* Brand Header */}
-      <div className="p-4 border-b border-slate-800/80 flex items-center gap-3">
-        <div className="relative">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-400 flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-            <Activity className="w-5 h-5" />
-          </div>
-          <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#090d16]"></span>
+      <div className="p-4 border-b border-[var(--border-subtle)] flex items-center gap-3">
+        <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-xs">
+          <Activity className="w-4 h-4" />
         </div>
         <div>
           <div className="flex items-center gap-1.5">
-            <h1 className="text-base font-extrabold tracking-tight text-white font-sans">
+            <h1 className="text-sm font-extrabold tracking-tight text-[var(--text-primary)]">
               CHRONOS
             </h1>
-            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-gradient-to-r from-blue-500/20 to-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
-              PRO
+            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-600 dark:text-cyan-300 border border-blue-500/20 font-mono">
+              ATSA
             </span>
           </div>
-          <p className="text-[11px] text-slate-400 font-medium">Time Series Intelligence</p>
+          <p className="text-[10px] text-[var(--text-tertiary)] font-medium">Time Series Platform</p>
         </div>
       </div>
 
       {/* Navigation List */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1.5">
-        <div className="px-3 pb-1 text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+        <div className="px-3 pt-1 pb-1 text-[10px] font-bold tracking-wider text-[var(--text-tertiary)] uppercase">
           Workspaces
         </div>
         <NavLink to="/" className={navItemClass}>
-          <LayoutDashboard className="w-4 h-4 text-blue-400" />
-          <span>Overview Dashboard</span>
+          <LayoutDashboard className="w-4 h-4 text-blue-500" />
+          <span>Overview</span>
         </NavLink>
         <NavLink to="/datasets" className={navItemClass}>
-          <Database className="w-4 h-4 text-emerald-400" />
-          <span>Data Ingestion & Hub</span>
+          <Database className="w-4 h-4 text-emerald-500" />
+          <span>Datasets & Hub</span>
         </NavLink>
         <NavLink to="/explore" className={navItemClass}>
-          <LineChart className="w-4 h-4 text-cyan-400" />
-          <span>Exploratory Analytics</span>
+          <LineChart className="w-4 h-4 text-cyan-500" />
+          <span>Exploratory Analysis</span>
         </NavLink>
         <NavLink to="/statistical-tests" className={navItemClass}>
-          <Activity className="w-4 h-4 text-violet-400" />
-          <span>Hypothesis & Tests</span>
+          <Activity className="w-4 h-4 text-violet-500" />
+          <span>Tests & Stationarity</span>
         </NavLink>
 
-        <div className="pt-4 px-3 pb-1 text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+        <div className="pt-3 px-3 pb-1 text-[10px] font-bold tracking-wider text-[var(--text-tertiary)] uppercase">
           Model Zoo
         </div>
 
@@ -76,25 +83,35 @@ export const Sidebar: React.FC = () => {
         <div>
           <button
             onClick={() => setModelsOpen(!modelsOpen)}
-            className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 transition-colors"
+            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition cursor-pointer ${
+              isDark
+                ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
           >
             <div className="flex items-center gap-3">
-              <Cpu className="w-4 h-4 text-amber-400" />
-              <span>ATSA Algorithms</span>
+              <Cpu className="w-4 h-4 text-amber-500" />
+              <span>ATSA Models</span>
             </div>
-            {modelsOpen ? <ChevronDown className="w-3.5 h-3.5 text-slate-400" /> : <ChevronRight className="w-3.5 h-3.5 text-slate-400" />}
+            {modelsOpen ? (
+              <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+            ) : (
+              <ChevronRight className="w-3.5 h-3.5 opacity-60" />
+            )}
           </button>
 
           {modelsOpen && (
-            <div className="mt-1 space-y-0.5 border-l border-slate-800/80 ml-4 pl-1">
+            <div className={`mt-0.5 space-y-0.5 ml-3 pl-1 border-l ${
+              isDark ? 'border-slate-800' : 'border-slate-200'
+            }`}>
               <NavLink to="/models/naive" className={subNavItemClass}>
                 <span>Naive Benchmark</span>
               </NavLink>
               <NavLink to="/models/linear_trend" className={subNavItemClass}>
-                <span>Linear Trend Regression</span>
+                <span>Linear Trend</span>
               </NavLink>
               <NavLink to="/models/ses" className={subNavItemClass}>
-                <span>Simple Exp Smoothing (SES)</span>
+                <span>SES Exponential</span>
               </NavLink>
               <NavLink to="/models/holt" className={subNavItemClass}>
                 <span>Holt's Linear Trend</span>
@@ -109,7 +126,7 @@ export const Sidebar: React.FC = () => {
                 <span>MA(q) Moving Average</span>
               </NavLink>
               <NavLink to="/models/arma" className={subNavItemClass}>
-                <span>ARMA(p, q) Process</span>
+                <span>ARMA(p, q)</span>
               </NavLink>
               <NavLink to="/models/arima" className={subNavItemClass}>
                 <span>ARIMA(p, d, q)</span>
@@ -121,32 +138,32 @@ export const Sidebar: React.FC = () => {
           )}
         </div>
 
-        <div className="pt-4 px-3 pb-1 text-[10px] font-bold tracking-widest text-slate-400 uppercase">
-          Insights
+        <div className="pt-3 px-3 pb-1 text-[10px] font-bold tracking-wider text-[var(--text-tertiary)] uppercase">
+          Evaluation
         </div>
 
         <NavLink to="/model-comparison" className={navItemClass}>
-          <GitCompare className="w-4 h-4 text-fuchsia-400" />
-          <span>Comparison Lab</span>
+          <GitCompare className="w-4 h-4 text-fuchsia-500" />
+          <span>Model Comparison</span>
         </NavLink>
         <NavLink to="/forecast" className={navItemClass}>
-          <Compass className="w-4 h-4 text-sky-400" />
+          <Compass className="w-4 h-4 text-sky-500" />
           <span>Forecast Horizon</span>
         </NavLink>
         <NavLink to="/reports" className={navItemClass}>
-          <FileText className="w-4 h-4 text-rose-400" />
-          <span>Documentation Hub</span>
+          <FileText className="w-4 h-4 text-rose-500" />
+          <span>Reports & Hub</span>
         </NavLink>
       </div>
 
-      {/* Footer Info */}
-      <div className="p-3 border-t border-slate-800/80 bg-slate-950/40 text-[11px] text-slate-400">
+      {/* Minimal Footer */}
+      <div className="p-3 border-t border-[var(--border-subtle)] text-[11px] text-[var(--text-tertiary)]">
         <div className="flex items-center justify-between">
-          <span className="flex items-center gap-1.5 font-medium text-slate-300">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="flex items-center gap-1.5 font-medium text-[var(--text-secondary)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
             Python Engine
           </span>
-          <span className="font-mono text-cyan-400 text-[10px] bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-800/30">
+          <span className="font-mono text-[10px] opacity-75">
             FastAPI 3.12
           </span>
         </div>

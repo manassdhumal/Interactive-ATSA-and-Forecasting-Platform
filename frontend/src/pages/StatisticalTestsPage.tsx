@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useApp } from '../context/AppContext';
+import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
 import { ADFResult, ACFPACFResult } from '../types';
 import {
@@ -11,6 +12,8 @@ import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const StatisticalTestsPage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
+  const { isDark, chartTheme } = useTheme();
+  const [activeTab, setActiveTab] = useState<'unitroot' | 'correlogram'>('unitroot');
   const [adfResult, setAdfResult] = useState<ADFResult | null>(null);
   const [kpssResult, setKpssResult] = useState<ADFResult | null>(null);
   const [acfPacfResult, setAcfPacfResult] = useState<ACFPACFResult | null>(null);
@@ -46,327 +49,371 @@ export const StatisticalTestsPage: React.FC = () => {
     val: acfPacfResult?.pacf[i]
   }));
 
+  const isStationary = adfResult ? adfResult.p_value < 0.05 : false;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-white">Statistical Tests & Stationarity</h1>
-        <p className="text-sm text-slate-400">
-          Augmented Dickey-Fuller (ADF) hypothesis test, Autocorrelation (ACF), and Partial Autocorrelation (PACF)
-        </p>
-      </div>
-
-      {/* ADF Test Results Panel */}
-      <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
-          <div>
-            <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Activity className="w-4 h-4 text-violet-400" />
-              Augmented Dickey-Fuller (ADF) Test
-            </h2>
-            <p className="text-xs text-slate-400">
-              Null hypothesis (H₀): The series possesses a unit root (is non-stationary).
-            </p>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400">Regression Specification:</span>
-            <select
-              value={regressionType}
-              onChange={(e) => setRegressionType(e.target.value)}
-              className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-slate-200"
-            >
-              <option value="c">Constant only ('c')</option>
-              <option value="ct">Constant and Linear Trend ('ct')</option>
-              <option value="nc">No constant or trend ('nc')</option>
-            </select>
-          </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight text-[var(--text-primary)]">
+            Statistical Tests & Stationarity
+          </h1>
+          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+            Augmented Dickey-Fuller (ADF) hypothesis testing, KPSS verification, and ACF/PACF correlograms
+          </p>
         </div>
 
-        {adfResult && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-              <span className="text-xs text-slate-400">Test Statistic (t)</span>
-              <div className="text-xl font-bold text-white font-mono mt-1">
-                {adfResult.test_statistic.toFixed(4)}
-              </div>
-              <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                Lags used: {adfResult.lags_used} (N={adfResult.n_obs})
-              </div>
-            </div>
-
-            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-              <span className="text-xs text-slate-400">p-value</span>
-              <div className={`text-xl font-bold font-mono mt-1 ${adfResult.p_value < 0.05 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {adfResult.p_value < 0.0001 ? '< 0.0001' : adfResult.p_value.toFixed(4)}
-              </div>
-              <div className="text-[11px] text-slate-400 mt-1">
-                Threshold: α = 0.05
-              </div>
-            </div>
-
-            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-              <span className="text-xs text-slate-400">MacKinnon Critical Values</span>
-              <div className="text-xs font-mono text-slate-300 mt-1 space-y-0.5">
-                <div>1%: {adfResult.critical_values['1%']?.toFixed(3)}</div>
-                <div>5%: {adfResult.critical_values['5%']?.toFixed(3)}</div>
-                <div>10%: {adfResult.critical_values['10%']?.toFixed(3)}</div>
-              </div>
-            </div>
-
-            <div className={`p-4 rounded-lg border flex flex-col justify-between ${
-              adfResult.is_stationary
-                ? 'bg-emerald-950/20 border-emerald-500/40'
-                : 'bg-amber-950/20 border-amber-500/40'
-            }`}>
-              <div className="flex items-center gap-2">
-                {adfResult.is_stationary ? (
-                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                ) : (
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                )}
-                <span className="text-xs font-bold text-white uppercase tracking-wider">
-                  {adfResult.is_stationary ? 'Stationary' : 'Non-Stationary'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 mt-2 leading-relaxed">
-                {adfResult.interpretation}
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Minimalist Segmented Tabs */}
+        <div className={`flex items-center p-1 rounded-xl border text-xs font-medium self-start ${
+          isDark ? 'bg-slate-900/60 border-slate-800' : 'bg-slate-100 border-slate-200'
+        }`}>
+          <button
+            onClick={() => setActiveTab('unitroot')}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              activeTab === 'unitroot'
+                ? isDark ? 'bg-blue-600 text-white font-semibold' : 'bg-white text-slate-900 font-semibold shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Unit Root Tests
+          </button>
+          <button
+            onClick={() => setActiveTab('correlogram')}
+            className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+              activeTab === 'correlogram'
+                ? isDark ? 'bg-blue-600 text-white font-semibold' : 'bg-white text-slate-900 font-semibold shadow-xs'
+                : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+            }`}
+          >
+            Correlograms (ACF / PACF)
+          </button>
+        </div>
       </div>
 
-      {/* KPSS Stationarity Test Results Panel */}
-      {kpssResult && (
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-          <div className="mb-4">
-            <h2 className="text-base font-semibold text-white flex items-center gap-2">
-              <Activity className="w-4 h-4 text-cyan-400" />
-              Kwiatkowski–Phillips–Schmidt–Shin (KPSS) Test
-            </h2>
-            <p className="text-xs text-slate-400">
-              Null hypothesis (H₀): The series is level/trend stationary. (Opposite orientation of ADF)
-            </p>
+      {activeTab === 'unitroot' && (
+        <div className="space-y-6">
+          {/* ADF Test Results Panel */}
+          <div className={`p-5 rounded-2xl border transition ${
+            isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+          }`}>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-violet-500" />
+                  Augmented Dickey-Fuller (ADF) Test
+                </h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                  Null hypothesis (H₀): The series possesses a unit root (is non-stationary).
+                </p>
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-[var(--text-tertiary)]">Specification:</span>
+                <select
+                  value={regressionType}
+                  onChange={(e) => setRegressionType(e.target.value)}
+                  className={`border rounded-lg px-2.5 py-1 text-xs ${
+                    isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                  }`}
+                >
+                  <option value="c">Constant only ('c')</option>
+                  <option value="ct">Constant and Linear Trend ('ct')</option>
+                  <option value="nc">No constant or trend ('nc')</option>
+                </select>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="py-12 text-center text-xs text-[var(--text-tertiary)]">
+                Computing Dickey-Fuller test regression...
+              </div>
+            ) : adfResult ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className={`p-3.5 rounded-xl border ${
+                    isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                  }`}>
+                    <span className="text-[11px] text-[var(--text-tertiary)]">Test Statistic (t)</span>
+                    <div className="text-xl font-bold font-mono text-[var(--text-primary)] mt-1">
+                      {adfResult.test_statistic.toFixed(4)}
+                    </div>
+                    <div className="text-[10px] text-[var(--text-tertiary)] mt-1 font-mono">
+                      Lags: {adfResult.lags_used} (N={adfResult.n_obs})
+                    </div>
+                  </div>
+
+                  <div className={`p-3.5 rounded-xl border ${
+                    isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                  }`}>
+                    <span className="text-[11px] text-[var(--text-tertiary)]">p-value</span>
+                    <div className={`text-xl font-bold font-mono mt-1 ${
+                      isStationary
+                        ? isDark ? 'text-emerald-400' : 'text-emerald-600'
+                        : isDark ? 'text-amber-400' : 'text-amber-600'
+                    }`}>
+                      {adfResult.p_value < 0.0001 ? '< 0.0001' : adfResult.p_value.toFixed(4)}
+                    </div>
+                    <div className="text-[10px] text-[var(--text-tertiary)] mt-1">
+                      Threshold α = 0.05
+                    </div>
+                  </div>
+
+                  <div className={`p-3.5 rounded-xl border ${
+                    isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                  }`}>
+                    <span className="text-[11px] text-[var(--text-tertiary)]">Critical Values</span>
+                    <div className="text-xs font-mono space-y-0.5 mt-1 text-[var(--text-secondary)]">
+                      <div>1%: <span className="font-semibold">{adfResult.critical_values['1%'].toFixed(3)}</span></div>
+                      <div>5%: <span className="font-semibold">{adfResult.critical_values['5%'].toFixed(3)}</span></div>
+                      <div>10%: <span className="font-semibold">{adfResult.critical_values['10%'].toFixed(3)}</span></div>
+                    </div>
+                  </div>
+
+                  <div className={`p-3.5 rounded-xl border flex flex-col justify-between ${
+                    isStationary
+                      ? isDark ? 'bg-emerald-950/20 border-emerald-500/30' : 'bg-emerald-50 border-emerald-200'
+                      : isDark ? 'bg-amber-950/20 border-amber-500/30' : 'bg-amber-50 border-amber-200'
+                  }`}>
+                    <span className="text-[11px] font-semibold text-[var(--text-tertiary)]">Verdict</span>
+                    <div className="flex items-center gap-2 mt-1">
+                      {isStationary ? (
+                        <>
+                          <ShieldCheck className={`w-5 h-5 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+                          <span className={`text-sm font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                            Stationary
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertTriangle className={`w-5 h-5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+                          <span className={`text-sm font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+                            Non-Stationary
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div className="text-[10px] text-[var(--text-secondary)] mt-1">
+                      {isStationary ? 'Reject H₀ (p < 0.05)' : 'Fail to reject H₀ (p ≥ 0.05)'}
+                    </div>
+                  </div>
+                </div>
+
+                <ChartExplanation
+                  title="How to Interpret ADF Unit-Root Hypothesis Results"
+                  summary="The Augmented Dickey-Fuller (ADF) test evaluates whether a time series has a unit root, which causes mean/variance drift over time. A stationary process is mean-reverting with constant variance."
+                  items={[
+                    {
+                      badge: "H₀ Null",
+                      badgeColor: "amber",
+                      label: "Unit Root Exists",
+                      text: "The series is non-stationary. Shocks persist indefinitely and the series exhibits long-term drift."
+                    },
+                    {
+                      badge: "p < 0.05",
+                      badgeColor: "emerald",
+                      label: "Stationary Result",
+                      text: "Reject H₀ at the 5% level. The series reverts to a stable mean and is suitable for AR/MA/ARMA modeling."
+                    },
+                    {
+                      badge: "t-Statistic",
+                      badgeColor: "blue",
+                      label: "Rejection Threshold",
+                      text: "The test statistic must be more negative than the 5% critical value (e.g. -3.45 < -2.86) to reject non-stationarity."
+                    },
+                    {
+                      badge: "Next Step",
+                      badgeColor: "cyan",
+                      label: "If Non-Stationary",
+                      text: "Apply first-order differencing ΔY_t = Y_t - Y_{t-1} (or ARIMA with d ≥ 1) to stationarize the series."
+                    }
+                  ]}
+                  takeaway={
+                    isStationary
+                      ? "The ADF test confirms your target series is stationary. You can proceed directly to AR, MA, or ARMA modeling without requiring differencing."
+                      : "The series exhibits a unit root. Do not fit standard ARMA directly without first differencing (d=1) or using ARIMA(p, 1, q)."
+                  }
+                  formula="ΔY_t = α + β·t + γ·Y_{t-1} + \sum δ_i ΔY_{t-i} + ε_t"
+                />
+              </>
+            ) : null}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-              <span className="text-xs text-slate-400">Test Statistic (LM)</span>
-              <div className="text-xl font-bold text-white font-mono mt-1">
-                {kpssResult.test_statistic.toFixed(4)}
-              </div>
-              <div className="text-[11px] text-slate-400 mt-1 font-mono">
-                Lags used: {kpssResult.lags_used}
-              </div>
-            </div>
-
-            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-              <span className="text-xs text-slate-400">p-value</span>
-              <div className={`text-xl font-bold font-mono mt-1 ${kpssResult.p_value >= 0.05 ? 'text-emerald-400' : 'text-amber-400'}`}>
-                {kpssResult.p_value.toFixed(4)}
-              </div>
-              <div className="text-[11px] text-slate-400 mt-1">
-                Threshold: α = 0.05
-              </div>
-            </div>
-
-            <div className="bg-slate-900/60 p-4 rounded-lg border border-slate-800">
-              <span className="text-xs text-slate-400">Critical Values</span>
-              <div className="text-xs font-mono text-slate-300 mt-1 space-y-0.5">
-                <div>1%: {kpssResult.critical_values['1%']?.toFixed(3)}</div>
-                <div>5%: {kpssResult.critical_values['5%']?.toFixed(3)}</div>
-                <div>10%: {kpssResult.critical_values['10%']?.toFixed(3)}</div>
-              </div>
-            </div>
-
-            <div className={`p-4 rounded-lg border flex flex-col justify-between ${
-              kpssResult.is_stationary
-                ? 'bg-emerald-950/20 border-emerald-500/40'
-                : 'bg-amber-950/20 border-amber-500/40'
+          {/* Optional KPSS Test Panel */}
+          {kpssResult && (
+            <div className={`p-5 rounded-2xl border transition ${
+              isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
             }`}>
-              <div className="flex items-center gap-2">
-                {kpssResult.is_stationary ? (
-                  <ShieldCheck className="w-5 h-5 text-emerald-400" />
-                ) : (
-                  <AlertTriangle className="w-5 h-5 text-amber-400" />
-                )}
-                <span className="text-xs font-bold text-white uppercase tracking-wider">
-                  {kpssResult.is_stationary ? 'Stationary' : 'Non-Stationary'}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                  KPSS Confirmatory Test (Kwiatkowski–Phillips–Schmidt–Shin)
+                </h3>
+                <span className="text-[11px] text-[var(--text-tertiary)]">
+                  Null hypothesis (H₀): Series IS stationary
                 </span>
               </div>
-              <p className="text-[11px] text-slate-300 mt-2 leading-relaxed">
-                {kpssResult.interpretation}
-              </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className={`p-3 rounded-xl border ${
+                  isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                }`}>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">KPSS Stat</span>
+                  <div className="text-lg font-bold font-mono text-[var(--text-primary)] mt-0.5">
+                    {kpssResult.test_statistic.toFixed(4)}
+                  </div>
+                </div>
+                <div className={`p-3 rounded-xl border ${
+                  isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                }`}>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">p-value</span>
+                  <div className="text-lg font-bold font-mono text-[var(--text-primary)] mt-0.5">
+                    {kpssResult.p_value.toFixed(4)}
+                  </div>
+                </div>
+                <div className={`p-3 rounded-xl border ${
+                  isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
+                }`}>
+                  <span className="text-[11px] text-[var(--text-tertiary)]">Interpretation</span>
+                  <div className="text-xs font-semibold text-[var(--text-secondary)] mt-1">
+                    {kpssResult.p_value >= 0.05 ? 'Stationary (p ≥ 0.05)' : 'Non-Stationary (p < 0.05)'}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* ACF and PACF Side-by-Side Correlograms */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* ACF */}
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h2 className="text-base font-semibold text-white">Autocorrelation Function (ACF)</h2>
-              <p className="text-xs text-slate-400">Total correlation between Y_t and lagged observations</p>
-            </div>
-            <span className="text-[11px] font-mono text-slate-400">
-              CI ±{(acfPacfResult?.ci_bound || 0.196).toFixed(3)}
+      {activeTab === 'correlogram' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-[var(--text-secondary)]">
+              Showing Autocorrelation & Partial Autocorrelation with 95% Bartlett confidence bands (±1.96 / √N)
             </span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-[var(--text-tertiary)]">Lags:</span>
+              <input
+                type="number"
+                min="6"
+                max="60"
+                value={maxLags}
+                onChange={(e) => setMaxLags(Number(e.target.value))}
+                className={`w-16 border rounded-lg px-2 py-1 font-mono text-xs ${
+                  isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
+                }`}
+              />
+            </div>
           </div>
 
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={acfPoints}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="lag" stroke="#64748b" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[-1, 1]} />
-                <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
-                <ReferenceLine y={acfPacfResult?.ci_bound || 0.196} stroke="#38bdf8" strokeDasharray="3 3" />
-                <ReferenceLine y={-(acfPacfResult?.ci_bound || 0.196)} stroke="#38bdf8" strokeDasharray="3 3" />
-                <ReferenceLine y={0} stroke="#475569" />
-                <Bar dataKey="val" fill="#3b82f6" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <ChartExplanation
-            title="How to Read the ACF Correlogram"
-            summary="The ACF measures gross linear correlation between observations separated by lag k, capturing both direct dependence and indirect effects cascading through intermediate time periods."
-            formula="ρ_k = Cov(Y_t, Y_{t-k}) / Var(Y_t)"
-            items={[
-              {
-                badge: "Blue Vertical Bars",
-                badgeColor: "blue",
-                label: "Autocorrelation (ρ_k)",
-                text: "The height of each bar represents correlation strength from -1.0 to +1.0 for each time displacement k."
-              },
-              {
-                badge: "Dashed Cyan Lines",
-                badgeColor: "cyan",
-                label: "95% Bartlett CI (±1.96/√N)",
-                text: "Confidence boundaries for white noise. Bars that stay inside the dashed lines are statistically negligible (random noise)."
-              },
-              {
-                badge: "Slow Gradual Decay",
-                badgeColor: "amber",
-                label: "Non-Stationary Unit Root",
-                text: "If positive bars decay very slowly across 15+ lags, the series has persistence/trend and requires first-differencing (d=1)."
-              },
-              {
-                badge: "Sharp Cutoff at Lag q",
-                badgeColor: "emerald",
-                label: "Moving Average MA(q)",
-                text: "If bars abruptly plunge inside the bounds after lag q, it suggests an MA(q) process order."
-              }
-            ]}
-            takeaway="Use the ACF cutoff to select the Moving Average order q. If ACF decays slowly without cutting off, difference the series (d ≥ 1)."
-          />
-        </div>
-
-        {/* PACF */}
-        <div className="bg-[#101728] border border-slate-800 rounded-xl p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <div>
-                <h2 className="text-base font-semibold text-white">Partial Autocorrelation Function (PACF)</h2>
-                <p className="text-xs text-slate-400">Direct correlation between Y_t and Y_{'t-k'}, controlling for intermediate lags</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* ACF Chart Card */}
+            <div className={`p-5 rounded-2xl border transition ${
+              isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
+                  Autocorrelation Function (ACF)
+                </h3>
+                <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                  Bounds: ±{acfPacfResult?.ci_bound?.toFixed(3) ?? '0.196'}
+                </span>
               </div>
-              <span className="text-[11px] font-mono text-slate-400">
-                CI ±{(acfPacfResult?.ci_bound || 0.196).toFixed(3)}
-              </span>
+              <div className="h-60 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={acfPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                    <XAxis dataKey="lag" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                    <YAxis stroke={chartTheme.axis} domain={[-1, 1]} tick={{ fontSize: 9 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: chartTheme.tooltipBg,
+                        borderColor: chartTheme.tooltipBorder,
+                        color: chartTheme.tooltipText,
+                        borderRadius: '10px',
+                        fontSize: '11px',
+                        boxShadow: chartTheme.tooltipShadow
+                      }}
+                    />
+                    <ReferenceLine y={0} stroke={chartTheme.zeroLine} />
+                    <ReferenceLine y={acfPacfResult?.ci_bound || 0.196} stroke="#f59e0b" strokeDasharray="3 3" />
+                    <ReferenceLine y={-(acfPacfResult?.ci_bound || 0.196)} stroke="#f59e0b" strokeDasharray="3 3" />
+                    <Bar dataKey="val" fill={chartTheme.forecast} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
 
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={pacfPoints}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                  <XAxis dataKey="lag" stroke="#64748b" tick={{ fontSize: 10 }} />
-                  <YAxis stroke="#64748b" tick={{ fontSize: 10 }} domain={[-1, 1]} />
-                  <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }} />
-                  <ReferenceLine y={acfPacfResult?.ci_bound || 0.196} stroke="#38bdf8" strokeDasharray="3 3" />
-                  <ReferenceLine y={-(acfPacfResult?.ci_bound || 0.196)} stroke="#38bdf8" strokeDasharray="3 3" />
-                  <ReferenceLine y={0} stroke="#475569" />
-                  <Bar dataKey="val" fill="#a855f7" />
-                </BarChart>
-              </ResponsiveContainer>
+            {/* PACF Chart Card */}
+            <div className={`p-5 rounded-2xl border transition ${
+              isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                  Partial Autocorrelation Function (PACF)
+                </h3>
+                <span className="text-[11px] font-mono text-[var(--text-tertiary)]">
+                  Order Determination
+                </span>
+              </div>
+              <div className="h-60 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={pacfPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                    <XAxis dataKey="lag" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                    <YAxis stroke={chartTheme.axis} domain={[-1, 1]} tick={{ fontSize: 9 }} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: chartTheme.tooltipBg,
+                        borderColor: chartTheme.tooltipBorder,
+                        color: chartTheme.tooltipText,
+                        borderRadius: '10px',
+                        fontSize: '11px',
+                        boxShadow: chartTheme.tooltipShadow
+                      }}
+                    />
+                    <ReferenceLine y={0} stroke={chartTheme.zeroLine} />
+                    <ReferenceLine y={acfPacfResult?.ci_bound || 0.196} stroke="#f59e0b" strokeDasharray="3 3" />
+                    <ReferenceLine y={-(acfPacfResult?.ci_bound || 0.196)} stroke="#f59e0b" strokeDasharray="3 3" />
+                    <Bar dataKey="val" fill={chartTheme.actual} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
           <ChartExplanation
-            title="How to Read the PACF Correlogram"
-            summary="The PACF isolates the pure, direct relationship between Y_t and Y_{t-k} by mathematically partialling out (controlling for) all intermediate intervening observations Y_{t-1}, ..., Y_{t-k+1}."
-            formula="ϕ_{kk} = Corr(Y_t, Y_{t-k} | Y_{t-1}, ..., Y_{t-k+1})"
+            title="Box-Jenkins Order Identification via Correlograms"
+            summary="Autocorrelation (ACF) measures the direct and indirect correlation with past lags, while Partial Autocorrelation (PACF) isolates the net correlation controlling for intermediate periods."
             items={[
               {
-                badge: "Purple Vertical Bars",
-                badgeColor: "purple",
-                label: "Partial Autocorrelation",
-                text: "The direct linear contribution of lag k alone after removing intermediary collinearity."
+                badge: "Amber Dashed",
+                badgeColor: "amber",
+                label: "95% Bartlett Bounds",
+                text: "Lags exceeding this band (±1.96 / √N) are statistically significant beyond white-noise chance."
               },
               {
-                badge: "Dashed Cyan Lines",
+                badge: "AR(p) Signature",
+                badgeColor: "blue",
+                label: "PACF Cuts Off",
+                text: "If PACF drops sharply after lag p while ACF tails off exponentially, an Autoregressive AR(p) process is indicated."
+              },
+              {
+                badge: "MA(q) Signature",
                 badgeColor: "cyan",
-                label: "Significance Threshold",
-                text: "Any purple bar extending beyond the dashed lines is statistically significant at α = 0.05."
+                label: "ACF Cuts Off",
+                text: "If ACF drops sharply after lag q while PACF decays smoothly, a Moving Average MA(q) process is indicated."
               },
               {
-                badge: "Sharp Cutoff at Lag p",
-                badgeColor: "emerald",
-                label: "Autoregressive AR(p)",
-                text: "If bars 1 to p breach the confidence bound and then plunge to zero at lag p+1, the series is an AR(p) process."
-              },
-              {
-                badge: "Damped Sine Waves",
-                badgeColor: "slate",
-                label: "Moving Average Signature",
-                text: "Oscillatory decaying bars in PACF accompanied by a sharp cutoff in ACF indicate an MA process."
+                badge: "ARMA(p, q)",
+                badgeColor: "purple",
+                label: "Dual Decay",
+                text: "When both ACF and PACF decay gradually without immediate sharp cutoffs, a combined ARMA(p, q) process is appropriate."
               }
             ]}
-            takeaway="Count the number of statistically significant purple bars before the cutoff to determine the autoregressive order p in AR(p) or ARIMA(p, d, q)."
+            takeaway="Count the number of significant initial spikes in the PACF to select the AR order p, and the spikes in ACF to select the MA order q."
+            formula="ρ_k = Cov(Y_t, Y_{t-k}) / Var(Y_t) \quad | \quad Bounds: \pm 1.96 / \sqrt{N}"
           />
         </div>
-      </div>
-
-      {/* Box-Jenkins Model Identification Summary Card */}
-      <div className="bg-[#101728] border border-slate-800 rounded-xl p-5">
-        <h3 className="text-sm font-bold text-white mb-1 flex items-center gap-2">
-          <Activity className="w-4 h-4 text-cyan-400" />
-          Box-Jenkins Model Identification Cheatsheet
-        </h3>
-        <p className="text-xs text-slate-400 mb-4">
-          How to combine ACF and PACF correlograms to identify the candidate time series model architecture:
-        </p>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-          <div className="bg-slate-900/60 p-3.5 rounded-xl border border-blue-500/20">
-            <div className="font-bold text-blue-400 font-mono mb-1">AR(p) — Autoregressive</div>
-            <ul className="text-slate-300 space-y-1 text-[11px] list-disc list-inside">
-              <li><strong className="text-white">ACF:</strong> Tapers off exponentially or as damped sine wave</li>
-              <li><strong className="text-white">PACF:</strong> Cuts off sharply after lag <code className="text-blue-300">p</code></li>
-              <li><span className="text-slate-400">Action: Set ARIMA order (p, 0, 0)</span></li>
-            </ul>
-          </div>
-
-          <div className="bg-slate-900/60 p-3.5 rounded-xl border border-purple-500/20">
-            <div className="font-bold text-purple-400 font-mono mb-1">MA(q) — Moving Average</div>
-            <ul className="text-slate-300 space-y-1 text-[11px] list-disc list-inside">
-              <li><strong className="text-white">ACF:</strong> Cuts off sharply after lag <code className="text-purple-300">q</code></li>
-              <li><strong className="text-white">PACF:</strong> Tapers off exponentially or oscillates</li>
-              <li><span className="text-slate-400">Action: Set ARIMA order (0, 0, q)</span></li>
-            </ul>
-          </div>
-
-          <div className="bg-slate-900/60 p-3.5 rounded-xl border border-emerald-500/20">
-            <div className="font-bold text-emerald-400 font-mono mb-1">ARMA(p, q) / ARIMA(p, d, q)</div>
-            <ul className="text-slate-300 space-y-1 text-[11px] list-disc list-inside">
-              <li><strong className="text-white">ACF:</strong> Tapers off after lag (q - p)</li>
-              <li><strong className="text-white">PACF:</strong> Tapers off after lag (p - q)</li>
-              <li><span className="text-slate-400">Action: Use AIC/BIC search or compare models</span></li>
-            </ul>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
