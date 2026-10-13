@@ -18,6 +18,8 @@ interface ChartThemeTokens {
   confidenceFill: string;
   confidenceStroke: string;
   zeroLine: string;
+  brushStroke: string;
+  brushFill: string;
 }
 
 interface ThemeContextType {
@@ -82,7 +84,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         trend: '#10b981',
         confidenceFill: 'rgba(6, 182, 212, 0.16)',
         confidenceStroke: '#06b6d4',
-        zeroLine: '#475569'
+        zeroLine: '#475569',
+        brushStroke: '#3b82f6',
+        brushFill: '#0f172a'
       };
     } else {
       return {
@@ -100,7 +104,9 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         trend: '#059669',
         confidenceFill: 'rgba(8, 145, 178, 0.14)',
         confidenceStroke: '#0891b2',
-        zeroLine: '#cbd5e1'
+        zeroLine: '#cbd5e1',
+        brushStroke: '#2563eb',
+        brushFill: '#f1f5f9'
       };
     }
   }, [isDark]);

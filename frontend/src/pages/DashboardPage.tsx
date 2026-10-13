@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
@@ -10,9 +10,10 @@ import {
 } from 'lucide-react';
 import {
   Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Area, AreaChart
+  CartesianGrid, Area, AreaChart, Brush
 } from 'recharts';
 import { ChartExplanation } from '../components/common/ChartExplanation';
+import { TimeZoomControls } from '../components/common/TimeZoomControls';
 
 export const DashboardPage: React.FC = () => {
   const { selectedDataset, selectedTarget, datasets } = useApp();
@@ -20,6 +21,7 @@ export const DashboardPage: React.FC = () => {
   const [stats, setStats] = useState<DescriptiveStats | null>(null);
   const [plotData, setPlotData] = useState<RollingTrendData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [zoomCount, setZoomCount] = useState<number>(90);
 
   useEffect(() => {
     if (selectedDataset && selectedTarget) {
@@ -31,21 +33,53 @@ export const DashboardPage: React.FC = () => {
         .then(([statsRes, plotRes]) => {
           setStats(statsRes);
           setPlotData(plotRes);
+          // Default zoom to 90 or all observations if fewer
+          const total = plotRes?.timestamps?.length || 90;
+          setZoomCount(Math.min(90, total));
         })
         .catch(console.error)
         .finally(() => setLoading(false));
     }
   }, [selectedDataset, selectedTarget]);
 
-  const chartPoints = (plotData?.timestamps || []).slice(-90).map((t, idx) => {
-    const origIdx = (plotData?.timestamps.length || 0) - 90 + idx;
-    return {
-      time: t.slice(0, 10),
-      value: plotData?.values[origIdx],
-      rolling: plotData?.rolling_mean[origIdx],
-      trend: plotData?.trend_line[origIdx]
-    };
-  });
+  const totalPoints = plotData?.timestamps?.length || 0;
+
+  const chartPoints = useMemo(() => {
+    if (!plotData || !plotData.timestamps) return [];
+    const timestamps = plotData.timestamps;
+    const count = zoomCount === 0 || zoomCount >= timestamps.length ? timestamps.length : zoomCount;
+    const startIdx = Math.max(0, timestamps.length - count);
+
+    return timestamps.slice(startIdx).map((t, idx) => {
+      const origIdx = startIdx + idx;
+      return {
+        time: t.slice(0, 10),
+        value: plotData.values[origIdx],
+        rolling: plotData.rolling_mean[origIdx],
+        trend: plotData.trend_line[origIdx]
+      };
+    });
+  }, [plotData, zoomCount]);
+
+  const handleZoomIn = () => {
+    const current = zoomCount === 0 ? totalPoints : zoomCount;
+    const next = Math.max(14, Math.floor(current * 0.65));
+    setZoomCount(next);
+  };
+
+  const handleZoomOut = () => {
+    const current = zoomCount === 0 ? totalPoints : zoomCount;
+    const next = Math.min(totalPoints, Math.ceil(current * 1.5));
+    setZoomCount(next >= totalPoints ? 0 : next);
+  };
+
+  const handleResetZoom = () => {
+    setZoomCount(0);
+  };
+
+  const handleSelectPreset = (count: number) => {
+    setZoomCount(count === 0 ? 0 : Math.min(count, totalPoints));
+  };
 
   return (
     <div className="space-y-6">
@@ -160,11 +194,11 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Trajectory Chart Card */}
+      {/* Main Trajectory Chart Card with Time Zoom Controls & Brush */}
       <div className={`p-5 rounded-2xl border transition ${
         isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
       }`}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-500"></span>
@@ -174,20 +208,32 @@ export const DashboardPage: React.FC = () => {
               Historical observations with 7-period moving average and fitted OLS trend line
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs font-medium">
-            <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-              <span className="w-2.5 h-1 bg-blue-500 rounded-full"></span> Actual
-            </span>
-            <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-              <span className="w-2.5 h-1 bg-amber-500 rounded-full"></span> Rolling (w=7)
-            </span>
-            <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-              <span className="w-2.5 h-1 bg-emerald-500 border-dashed rounded-full"></span> Trend
-            </span>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <TimeZoomControls
+              onZoomIn={handleZoomIn}
+              onZoomOut={handleZoomOut}
+              onReset={handleResetZoom}
+              onSelectPreset={handleSelectPreset}
+              currentCount={chartPoints.length}
+              totalCount={totalPoints}
+            />
+
+            <div className="flex items-center gap-3 text-xs font-medium">
+              <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                <span className="w-2.5 h-1 bg-blue-500 rounded-full"></span> Actual
+              </span>
+              <span className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                <span className="w-2.5 h-1 bg-amber-500 rounded-full"></span> Rolling
+              </span>
+              <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                <span className="w-2.5 h-1 bg-emerald-500 border-dashed rounded-full"></span> Trend
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="h-72 w-full">
+        <div className="h-76 w-full">
           {loading ? (
             <div className="h-full flex items-center justify-center text-[var(--text-tertiary)] text-xs font-mono">
               Computing trajectory...
@@ -217,6 +263,13 @@ export const DashboardPage: React.FC = () => {
                 <Area type="monotone" dataKey="value" stroke={chartTheme.actual} strokeWidth={2} fillOpacity={1} fill="url(#actualGrad)" dot={false} />
                 <Line type="monotone" dataKey="rolling" stroke={chartTheme.rolling} strokeWidth={1.5} dot={false} />
                 <Line type="monotone" dataKey="trend" stroke={chartTheme.trend} strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                <Brush
+                  dataKey="time"
+                  height={22}
+                  stroke={chartTheme.brushStroke}
+                  fill={chartTheme.brushFill}
+                  tickFormatter={(t) => t.slice(5, 10)}
+                />
               </AreaChart>
             </ResponsiveContainer>
           )}
@@ -245,10 +298,10 @@ export const DashboardPage: React.FC = () => {
               text: "Global linear regression (Y_t = β₀ + β₁·t). A steep upward/downward slope indicates deterministic non-stationarity in mean."
             },
             {
-              badge: "Divergence",
+              badge: "Time Zoom Bar",
               badgeColor: "cyan",
-              label: "Mean Drift",
-              text: "When actual points consistently stray far from horizontal stability, difference transformations (d ≥ 1) or seasonal adjustment may be necessary."
+              label: "Interactive Timeline Zoom",
+              text: "Drag the slider handles at the bottom of the chart or use the (+ / - / Presets) buttons above to zoom into specific time intervals."
             }
           ]}
           takeaway="If the actual values drift steadily away from a flat horizontal mean line, your series is non-stationary. Explore stationarity tests (ADF/KPSS) and consider differencing before fitting ARMA models."

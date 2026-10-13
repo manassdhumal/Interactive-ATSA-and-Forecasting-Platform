@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
 import { apiService } from '../services/api';
 import { ModelComparisonResult } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, Legend
+  CartesianGrid, Legend, Brush
 } from 'recharts';
 import { Trophy, Play, CheckSquare, Square, AlertCircle } from 'lucide-react';
 import { ChartExplanation } from '../components/common/ChartExplanation';
+import { TimeZoomControls } from '../components/common/TimeZoomControls';
 
 const CANDIDATE_MODELS = [
   { key: 'naive', label: 'Naive Baseline' },
@@ -34,6 +35,7 @@ export const ComparisonPage: React.FC = () => {
   const [comparisonResult, setComparisonResult] = useState<ModelComparisonResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [zoomCount, setZoomCount] = useState<number>(0);
 
   const toggleModel = (key: string) => {
     if (selectedKeys.includes(key)) {
@@ -56,6 +58,7 @@ export const ComparisonPage: React.FC = () => {
         seasonalPeriod
       );
       setComparisonResult(res);
+      setZoomCount(0);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || err.message || 'Comparison failed');
     } finally {
@@ -63,7 +66,7 @@ export const ComparisonPage: React.FC = () => {
     }
   };
 
-  const chartData = () => {
+  const fullChartData = useMemo(() => {
     if (!comparisonResult) return [];
     return comparisonResult.test_timestamps.map((t, idx) => {
       const row: Record<string, any> = {
@@ -75,7 +78,16 @@ export const ComparisonPage: React.FC = () => {
       });
       return row;
     });
-  };
+  }, [comparisonResult]);
+
+  const visibleChartData = useMemo(() => {
+    if (fullChartData.length === 0) return [];
+    const count = zoomCount === 0 || zoomCount >= fullChartData.length ? fullChartData.length : zoomCount;
+    const startIdx = Math.max(0, fullChartData.length - count);
+    return fullChartData.slice(startIdx);
+  }, [fullChartData, zoomCount]);
+
+  const totalPoints = fullChartData.length;
 
   const modelColors: Record<string, string> = {
     Actual: chartTheme.actual,
@@ -219,15 +231,38 @@ export const ComparisonPage: React.FC = () => {
             </div>
           )}
 
-          {/* Actual vs Forecast Overlay */}
+          {/* Actual vs Forecast Overlay with Time Zoom & Brush */}
           <div className={`p-5 rounded-2xl border transition ${
             isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
           }`}>
-            <h2 className="text-sm font-bold text-[var(--text-primary)] mb-0.5">Test Horizon Forecast Comparison</h2>
-            <p className="text-xs text-[var(--text-secondary)] mb-4">True unseen test observations versus simultaneous candidate model forecasts</p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-[var(--text-primary)]">Test Horizon Forecast Comparison</h2>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">True unseen test observations versus simultaneous candidate model forecasts</p>
+              </div>
+
+              <TimeZoomControls
+                onZoomIn={() => setZoomCount(prev => Math.max(5, Math.floor((prev === 0 ? totalPoints : prev) * 0.7)))}
+                onZoomOut={() => setZoomCount(prev => {
+                  const next = Math.ceil((prev === 0 ? totalPoints : prev) * 1.4);
+                  return next >= totalPoints ? 0 : next;
+                })}
+                onReset={() => setZoomCount(0)}
+                onSelectPreset={(c) => setZoomCount(c === 0 ? 0 : Math.min(c, totalPoints))}
+                currentCount={visibleChartData.length}
+                totalCount={totalPoints}
+                presets={[
+                  { label: '7d', count: 7 },
+                  { label: '14d', count: 14 },
+                  { label: '30d', count: 30 },
+                  { label: 'All', count: 0 }
+                ]}
+              />
+            </div>
+
             <div className="h-80 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <LineChart data={visibleChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
                   <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 10 }} />
                   <YAxis stroke={chartTheme.axis} tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
@@ -254,6 +289,7 @@ export const ComparisonPage: React.FC = () => {
                       dot={false}
                     />
                   ))}
+                  <Brush dataKey="time" height={20} stroke={chartTheme.brushStroke} fill={chartTheme.brushFill} tickFormatter={(t) => t.slice(5, 10)} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -275,16 +311,16 @@ export const ComparisonPage: React.FC = () => {
                   text: "Out-of-sample forward projections generated by each fitted time-series algorithm."
                 },
                 {
+                  badge: "Time Zoom Slider",
+                  badgeColor: "purple",
+                  label: "Horizon Zoom",
+                  text: "Use the zoom buttons or slider below the chart to focus closely on individual test steps."
+                },
+                {
                   badge: "Turning Point Accuracy",
                   badgeColor: "emerald",
                   label: "Shape Matching",
-                  text: "Observe which model anticipates real inflection points and seasonal swings versus projecting a flat line."
-                },
-                {
-                  badge: "Lagging Tendency",
-                  badgeColor: "amber",
-                  label: "Phase Delay",
-                  text: "Naive models often repeat the previous step, resulting in a 1-step lag delay behind the blue actual curve."
+                  text: "Observe which model anticipates real inflection points versus projecting a flat line."
                 }
               ]}
               takeaway="The winning model is the one whose dashed trajectory hugs the solid blue actual curve most faithfully across the entire test horizon."

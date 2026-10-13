@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useTheme } from '../context/ThemeContext';
@@ -6,13 +6,15 @@ import { apiService } from '../services/api';
 import { ModelFitResult } from '../types';
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, AreaChart, Area, BarChart, Bar
+  CartesianGrid, AreaChart, Area, BarChart, Bar, Brush, ReferenceLine
 } from 'recharts';
 import {
   Play, RotateCcw, Download, AlertTriangle,
   Info, Sparkles, Code2, Copy, Check
 } from 'lucide-react';
 import { ChartExplanation } from '../components/common/ChartExplanation';
+import { TimeZoomControls } from '../components/common/TimeZoomControls';
+import { ModelFittedExplanation } from '../components/common/ModelFittedExplanation';
 
 interface ModelConfig {
   title: string;
@@ -206,17 +208,23 @@ export const ModelWorkspacePage: React.FC = () => {
   const [fitResult, setFitResult] = useState<ModelFitResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'forecast' | 'diagnostics' | 'parameters' | 'metrics' | 'code'>('forecast');
+  const [activeTab, setActiveTab] = useState<'forecast' | 'explanation' | 'diagnostics' | 'parameters' | 'metrics' | 'code'>('forecast');
   const [copiedCode, setCopiedCode] = useState(false);
   
   // Auto-ARIMA search state
   const [autoSearching, setAutoSearching] = useState(false);
+
+  // Time Zoom states
+  const [forecastZoomCount, setForecastZoomCount] = useState<number>(0);
+  const [residualZoomCount, setResidualZoomCount] = useState<number>(0);
 
   // Sync default parameters when switching models
   React.useEffect(() => {
     setParameters(config.defaultParams);
     setFitResult(null);
     setErrorMsg(null);
+    setForecastZoomCount(0);
+    setResidualZoomCount(0);
   }, [modelType]);
 
   const handleAutoArimaSearch = async () => {
@@ -246,6 +254,9 @@ export const ModelWorkspacePage: React.FC = () => {
         confidenceLevel
       );
       setFitResult(res);
+      const totalLen = (res.timestamps?.length || 0) + (res.forecast_timestamps?.length || 0);
+      setForecastZoomCount(totalLen > 100 ? 100 : 0);
+      setResidualZoomCount(res.timestamps?.length > 100 ? 100 : 0);
     } catch (err: any) {
       setErrorMsg(err.response?.data?.detail || err.message || 'Model estimation failed');
     } finally {
@@ -253,7 +264,8 @@ export const ModelWorkspacePage: React.FC = () => {
     }
   };
 
-  const forecastChartData = () => {
+  // Full merged dataset for forecast chart
+  const fullForecastData = useMemo(() => {
     if (!fitResult) return [];
     const historical = fitResult.timestamps.map((t, idx) => ({
       time: t.slice(0, 10),
@@ -285,19 +297,45 @@ export const ModelWorkspacePage: React.FC = () => {
       });
     }
 
-    return [...historical.slice(-60), ...future];
-  };
+    return [...historical, ...future];
+  }, [fitResult]);
 
-  const residualChartData = () => {
+  const visibleForecastData = useMemo(() => {
+    if (fullForecastData.length === 0) return [];
+    const count = forecastZoomCount === 0 || forecastZoomCount >= fullForecastData.length
+      ? fullForecastData.length
+      : forecastZoomCount;
+    const startIdx = Math.max(0, fullForecastData.length - count);
+    return fullForecastData.slice(startIdx);
+  }, [fullForecastData, forecastZoomCount]);
+
+  // Full residual points
+  const fullResidualData = useMemo(() => {
     if (!fitResult) return [];
-    return fitResult.timestamps.slice(-60).map((t, idx) => {
-      const origIdx = fitResult.timestamps.length - 60 + idx;
-      return {
-        time: t.slice(0, 10),
-        residual: fitResult.residuals[origIdx]
-      };
-    });
-  };
+    return fitResult.timestamps.map((t, idx) => ({
+      time: t.slice(0, 10),
+      residual: fitResult.residuals[idx]
+    }));
+  }, [fitResult]);
+
+  const visibleResidualData = useMemo(() => {
+    if (fullResidualData.length === 0) return [];
+    const count = residualZoomCount === 0 || residualZoomCount >= fullResidualData.length
+      ? fullResidualData.length
+      : residualZoomCount;
+    const startIdx = Math.max(0, fullResidualData.length - count);
+    return fullResidualData.slice(startIdx);
+  }, [fullResidualData, residualZoomCount]);
+
+  // Residual ACF points
+  const residualAcfPoints = useMemo(() => {
+    if (!fitResult?.diagnostics?.acf) return [];
+    const acfData = fitResult.diagnostics.acf;
+    return acfData.lags.map((lag, i) => ({
+      lag: `L${lag}`,
+      val: acfData.values[i]
+    }));
+  }, [fitResult]);
 
   const handleCopyCode = () => {
     if (fitResult?.python_code) {
@@ -469,10 +507,11 @@ export const ModelWorkspacePage: React.FC = () => {
           }`}>
             {[
               { id: 'forecast', label: '1. Forecast & Fitted Overlay' },
-              { id: 'diagnostics', label: '2. Residual Diagnostics' },
-              { id: 'parameters', label: '3. Parameters' },
-              { id: 'metrics', label: '4. Evaluation Metrics' },
-              { id: 'code', label: '5. Python Script' }
+              { id: 'explanation', label: '2. Model Explanation & Dynamics' },
+              { id: 'diagnostics', label: '3. Residual Diagnostics (ACF & Tests)' },
+              { id: 'parameters', label: '4. Parameters' },
+              { id: 'metrics', label: '5. Evaluation Metrics' },
+              { id: 'code', label: '6. Python Script' }
             ].map(tab => (
               <button
                 key={tab.id}
@@ -490,12 +529,12 @@ export const ModelWorkspacePage: React.FC = () => {
             ))}
           </div>
 
-          {/* TAB 1: Forecast Chart */}
+          {/* TAB 1: Forecast Chart with Time Zoom & Brush */}
           {activeTab === 'forecast' && (
             <div className={`p-5 rounded-2xl border transition ${
               isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
             }`}>
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <div>
                   <h2 className="text-sm font-bold text-[var(--text-primary)]">
                     Observed, In-Sample Fitted & Forward Forecast
@@ -504,34 +543,49 @@ export const ModelWorkspacePage: React.FC = () => {
                     Confidence interval: {(confidenceLevel * 100).toFixed(0)}% shaded boundary
                   </p>
                 </div>
-                <div className="flex items-center gap-3 text-xs font-medium">
-                  <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-                    <span className="w-2.5 h-1 bg-blue-500 rounded-full"></span> Actual
-                  </span>
-                  <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                    <span className="w-2.5 h-1 bg-emerald-500 rounded-full"></span> Fitted
-                  </span>
-                  <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
-                    <span className="w-2.5 h-1 bg-rose-500 rounded-full"></span> Forecast
-                  </span>
-                  <a
-                    href={apiService.getForecastCsvUrl(fitResult.analysis_id)}
-                    download
-                    className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-mono ml-2 transition ${
-                      isDark
-                        ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                    }`}
-                  >
-                    <Download className="w-3 h-3" />
-                    CSV
-                  </a>
+
+                <div className="flex flex-wrap items-center gap-3">
+                  <TimeZoomControls
+                    onZoomIn={() => setForecastZoomCount(prev => Math.max(14, Math.floor((prev === 0 ? fullForecastData.length : prev) * 0.65)))}
+                    onZoomOut={() => setForecastZoomCount(prev => {
+                      const next = Math.ceil((prev === 0 ? fullForecastData.length : prev) * 1.5);
+                      return next >= fullForecastData.length ? 0 : next;
+                    })}
+                    onReset={() => setForecastZoomCount(0)}
+                    onSelectPreset={(c) => setForecastZoomCount(c === 0 ? 0 : Math.min(c, fullForecastData.length))}
+                    currentCount={visibleForecastData.length}
+                    totalCount={fullForecastData.length}
+                  />
+
+                  <div className="flex items-center gap-2 text-xs font-medium">
+                    <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
+                      <span className="w-2.5 h-1 bg-blue-500 rounded-full"></span> Actual
+                    </span>
+                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                      <span className="w-2.5 h-1 bg-emerald-500 rounded-full"></span> Fitted
+                    </span>
+                    <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
+                      <span className="w-2.5 h-1 bg-rose-500 rounded-full"></span> Forecast
+                    </span>
+                    <a
+                      href={apiService.getForecastCsvUrl(fitResult.analysis_id)}
+                      download
+                      className={`flex items-center gap-1 px-2 py-1 rounded-lg border text-xs font-mono ml-1 transition ${
+                        isDark
+                          ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      <Download className="w-3 h-3" />
+                      CSV
+                    </a>
+                  </div>
                 </div>
               </div>
 
               <div className="h-80 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={forecastChartData()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <AreaChart data={visibleForecastData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
                     <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 10 }} />
                     <YAxis stroke={chartTheme.axis} tick={{ fontSize: 10 }} domain={['auto', 'auto']} />
@@ -550,13 +604,14 @@ export const ModelWorkspacePage: React.FC = () => {
                     <Line type="monotone" dataKey="actual" stroke={chartTheme.actual} strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="fitted" stroke={chartTheme.fitted} strokeWidth={1.5} dot={false} />
                     <Line type="monotone" dataKey="forecast" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Brush dataKey="time" height={20} stroke={chartTheme.brushStroke} fill={chartTheme.brushFill} tickFormatter={(t) => t.slice(5, 10)} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
 
               <ChartExplanation
                 title="How to Read the Model Fit & Forecast Graph"
-                summary="This visualization overlays the model's in-sample fitted trajectory against the empirical ground truth, followed by forward out-of-sample projections and confidence uncertainty intervals."
+                summary="This visualization overlays the model's in-sample fitted trajectory against empirical ground truth, followed by forward out-of-sample projections and confidence uncertainty intervals."
                 items={[
                   {
                     badge: "Blue Curve",
@@ -568,45 +623,121 @@ export const ModelWorkspacePage: React.FC = () => {
                     badge: "Green Curve",
                     badgeColor: "emerald",
                     label: "Fitted Values (Ŷ_t)",
-                    text: "The model's in-sample one-step-ahead expectations. Tight alignment indicates strong explanatory power."
+                    text: "The model's in-sample expectations. Tight alignment indicates strong explanatory power."
                   },
                   {
                     badge: "Rose Red Curve",
                     badgeColor: "rose",
                     label: "Forecast (Ŷ_{T+h})",
-                    text: "Multi-step forward chronological projections computed using estimated model coefficients and state equations."
+                    text: "Multi-step forward chronological projections computed using estimated model coefficients."
                   },
                   {
-                    badge: "Light Cyan Band",
+                    badge: "Time Zoom Slider",
                     badgeColor: "cyan",
-                    label: "Prediction Intervals (±1.96σ)",
-                    text: "Probabilistic uncertainty funnel (95% confidence). Expands over longer horizons as variance compounds."
+                    label: "Zoom Horizon",
+                    text: "Drag the slider handles at the bottom or use the (+ / -) controls above to zoom into the forecast cutoff."
                   }
                 ]}
-                takeaway="A well-specified model tracks turning points in actual data without excessive lag, while maintaining realistic expanding prediction intervals that encompass likely future outcomes."
+                takeaway="A well-specified model tracks turning points in actual data without excessive lag, while maintaining realistic expanding prediction intervals."
+              />
+
+              {/* Dedicated Model-Specific Explanation for the Active Fitted Architecture */}
+              <ModelFittedExplanation
+                modelType={modelType}
+                fitResult={fitResult}
+                parameters={parameters}
+                forecastHorizon={forecastHorizon}
+                confidenceLevel={confidenceLevel}
               />
             </div>
           )}
 
-          {/* TAB 2: Diagnostics */}
-          {activeTab === 'diagnostics' && (
+          {/* TAB 2: Model-Specific Explanation & Mathematics */}
+          {activeTab === 'explanation' && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Residual Time Plot */}
+              <ModelFittedExplanation
+                modelType={modelType}
+                fitResult={fitResult}
+                parameters={parameters}
+                forecastHorizon={forecastHorizon}
+                confidenceLevel={confidenceLevel}
+              />
+            </div>
+          )}
+
+          {/* TAB 3: Diagnostics (with Residual ACF & Time Zoom) */}
+          {activeTab === 'diagnostics' && (
+            <div className="space-y-6">
+              {/* Residual Time Plot with Zoom & Brush */}
+              <div className={`p-5 rounded-2xl border transition ${
+                isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
+              }`}>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                  <div>
+                    <h3 className="text-sm font-bold text-[var(--text-primary)]">Residuals Over Time (e_t)</h3>
+                    <p className="text-xs text-[var(--text-secondary)]">Checking for mean zero and constant variance</p>
+                  </div>
+
+                  <TimeZoomControls
+                    onZoomIn={() => setResidualZoomCount(prev => Math.max(14, Math.floor((prev === 0 ? fullResidualData.length : prev) * 0.65)))}
+                    onZoomOut={() => setResidualZoomCount(prev => {
+                      const next = Math.ceil((prev === 0 ? fullResidualData.length : prev) * 1.5);
+                      return next >= fullResidualData.length ? 0 : next;
+                    })}
+                    onReset={() => setResidualZoomCount(0)}
+                    onSelectPreset={(c) => setResidualZoomCount(c === 0 ? 0 : Math.min(c, fullResidualData.length))}
+                    currentCount={visibleResidualData.length}
+                    totalCount={fullResidualData.length}
+                  />
+                </div>
+
+                <div className="h-60 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={visibleResidualData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
+                      <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                      <YAxis stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                      <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '8px', fontSize: '10px' }} />
+                      <ReferenceLine y={0} stroke={chartTheme.zeroLine} strokeDasharray="2 2" />
+                      <Line type="monotone" dataKey="residual" stroke="#f43f5e" dot={false} strokeWidth={1.5} />
+                      <Brush dataKey="time" height={18} stroke={chartTheme.brushStroke} fill={chartTheme.brushFill} tickFormatter={(t) => t.slice(5, 10)} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Residual ACF Correlogram + Ljung-Box + Histogram Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Residual Autocorrelation (ACF) */}
                 <div className={`p-5 rounded-2xl border transition ${
                   isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
                 }`}>
-                  <h3 className="text-sm font-bold text-[var(--text-primary)] mb-0.5">Residuals Over Time (e_t)</h3>
-                  <p className="text-xs text-[var(--text-secondary)] mb-3">Checking for mean zero and homoscedasticity</p>
-                  <div className="h-56">
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-cyan-500"></span>
+                      Residual ACF Correlogram
+                    </h3>
+                    <span className="text-[10px] font-mono text-[var(--text-tertiary)]">
+                      95% Bartlett: ±{fitResult.diagnostics.acf?.ci_bound?.toFixed(3) ?? '0.196'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[var(--text-secondary)] mb-3">
+                    Errors must be uncorrelated (spikes strictly inside dashed bands)
+                  </p>
+
+                  <div className="h-56 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={residualChartData()} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                      <BarChart data={residualAcfPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
-                        <XAxis dataKey="time" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
-                        <YAxis stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                        <XAxis dataKey="lag" stroke={chartTheme.axis} tick={{ fontSize: 9 }} />
+                        <YAxis stroke={chartTheme.axis} domain={[-1, 1]} tick={{ fontSize: 9 }} />
                         <Tooltip contentStyle={{ backgroundColor: chartTheme.tooltipBg, borderColor: chartTheme.tooltipBorder, color: chartTheme.tooltipText, borderRadius: '8px', fontSize: '10px' }} />
-                        <Line type="monotone" dataKey="residual" stroke="#f43f5e" dot={false} strokeWidth={1.5} />
-                      </LineChart>
+                        <ReferenceLine y={0} stroke={chartTheme.zeroLine} />
+                        <ReferenceLine y={fitResult.diagnostics.acf?.ci_bound || 0.196} stroke="#f59e0b" strokeDasharray="3 3" />
+                        <ReferenceLine y={-(fitResult.diagnostics.acf?.ci_bound || 0.196)} stroke="#f59e0b" strokeDasharray="3 3" />
+                        <Bar dataKey="val" fill={chartTheme.forecast} />
+                        <Brush dataKey="lag" height={18} stroke={chartTheme.brushStroke} fill={chartTheme.brushFill} />
+                      </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </div>
@@ -617,7 +748,7 @@ export const ModelWorkspacePage: React.FC = () => {
                 }`}>
                   <div>
                     <h3 className="text-sm font-bold text-[var(--text-primary)] mb-0.5">Ljung-Box White Noise Test</h3>
-                    <p className="text-xs text-[var(--text-secondary)] mb-3">Hypothesis test for independence of residuals</p>
+                    <p className="text-xs text-[var(--text-secondary)] mb-3">Formal hypothesis test for residual independence</p>
                     {fitResult.diagnostics.ljung_box && (
                       <div className={`p-3 rounded-xl border space-y-1.5 text-xs font-mono ${
                         isDark ? 'bg-slate-950/40 border-slate-800' : 'bg-slate-50 border-slate-200/80'
@@ -647,7 +778,7 @@ export const ModelWorkspacePage: React.FC = () => {
 
                   {fitResult.diagnostics.histogram && (
                     <div className="mt-4">
-                      <h4 className="text-xs font-semibold text-[var(--text-primary)] mb-2">Residual Histogram</h4>
+                      <h4 className="text-xs font-semibold text-[var(--text-primary)] mb-1.5">Residual Normality Histogram</h4>
                       <div className="h-28">
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={fitResult.diagnostics.histogram.bins.map((b, i) => ({
@@ -675,28 +806,28 @@ export const ModelWorkspacePage: React.FC = () => {
                     badge: "Zero Mean Oscillation",
                     badgeColor: "rose",
                     label: "Residual Line (e_t)",
-                    text: "Errors should fluctuate symmetrically around zero (0.0). A sloped residual line indicates missed trend; sinusoidal waves indicate missed seasonality."
+                    text: "Errors should fluctuate symmetrically around zero (0.0). A sloped residual line indicates missed trend."
                   },
                   {
-                    badge: "Constant Variance",
-                    badgeColor: "slate",
-                    label: "Homoscedasticity",
-                    text: "Residual scatter thickness should remain stable across time rather than expanding."
+                    badge: "Residual ACF",
+                    badgeColor: "cyan",
+                    label: "White Noise Bands",
+                    text: "All residual ACF bars should stay comfortably inside the amber dashed 95% Bartlett bounds."
                   },
                   {
                     badge: "Ljung-Box (p > 0.05)",
                     badgeColor: "emerald",
                     label: "White Noise Test",
-                    text: "Null hypothesis H₀: residuals are uncorrelated. If p > 0.05, you cannot reject H₀ (pass). If p < 0.05, serial correlation remains."
+                    text: "Null hypothesis H₀: residuals are uncorrelated. If p > 0.05, you cannot reject H₀ (pass)."
                   },
                   {
                     badge: "Bell-Shaped Curve",
                     badgeColor: "purple",
                     label: "Histogram Normality",
-                    text: "The histogram should resemble a symmetric Gaussian bell curve centered at zero without severe skewness."
+                    text: "The histogram should resemble a symmetric Gaussian bell curve centered at zero."
                   }
                 ]}
-                takeaway="A passing Ljung-Box test (p > 0.05) and a random, pattern-free residual plot confirm that your model captured all systematic predictability."
+                takeaway="A passing Ljung-Box test (p > 0.05) and residual ACF values within bounds confirm that your model captured all systematic predictability."
               />
             </div>
           )}

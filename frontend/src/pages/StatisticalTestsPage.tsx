@@ -5,9 +5,9 @@ import { apiService } from '../services/api';
 import { ADFResult, ACFPACFResult } from '../types';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  CartesianGrid, ReferenceLine
+  CartesianGrid, ReferenceLine, Brush
 } from 'recharts';
-import { Activity, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Activity, ShieldCheck, AlertTriangle, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { ChartExplanation } from '../components/common/ChartExplanation';
 
 export const StatisticalTestsPage: React.FC = () => {
@@ -50,6 +50,18 @@ export const StatisticalTestsPage: React.FC = () => {
   }));
 
   const isStationary = adfResult ? adfResult.p_value < 0.05 : false;
+
+  const handleZoomInLags = () => {
+    setMaxLags((prev) => Math.max(8, Math.floor(prev * 0.7)));
+  };
+
+  const handleZoomOutLags = () => {
+    setMaxLags((prev) => Math.min(60, Math.ceil(prev * 1.4)));
+  };
+
+  const handleResetLags = () => {
+    setMaxLags(24);
+  };
 
   return (
     <div className="space-y-6">
@@ -231,7 +243,7 @@ export const StatisticalTestsPage: React.FC = () => {
                       ? "The ADF test confirms your target series is stationary. You can proceed directly to AR, MA, or ARMA modeling without requiring differencing."
                       : "The series exhibits a unit root. Do not fit standard ARMA directly without first differencing (d=1) or using ARIMA(p, 1, q)."
                   }
-                  formula="ΔY_t = α + β·t + γ·Y_{t-1} + \sum δ_i ΔY_{t-i} + ε_t"
+                  formula="ΔY_t = α + β·t + γ·Y_{t-1} + ∑ δ_i ΔY_{t-i} + ε_t"
                 />
               </>
             ) : null}
@@ -283,27 +295,62 @@ export const StatisticalTestsPage: React.FC = () => {
 
       {activeTab === 'correlogram' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <span className="text-xs text-[var(--text-secondary)]">
-              Showing Autocorrelation & Partial Autocorrelation with 95% Bartlett confidence bands (±1.96 / √N)
+              Autocorrelation (ACF) & Partial Autocorrelation (PACF) with 95% Bartlett bounds (±1.96 / √N)
             </span>
+
+            {/* Lag Zoom Controls */}
             <div className="flex items-center gap-2 text-xs">
-              <span className="text-[var(--text-tertiary)]">Lags:</span>
-              <input
-                type="number"
-                min="6"
-                max="60"
-                value={maxLags}
-                onChange={(e) => setMaxLags(Number(e.target.value))}
-                className={`w-16 border rounded-lg px-2 py-1 font-mono text-xs ${
-                  isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
-                }`}
-              />
+              <div className={`flex items-center rounded-lg border p-0.5 ${
+                isDark ? 'bg-slate-900 border-slate-700/80' : 'bg-slate-100 border-slate-200'
+              }`}>
+                <button
+                  type="button"
+                  onClick={handleZoomInLags}
+                  title="Zoom In (fewer lags)"
+                  className="p-1 rounded-md transition hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <ZoomIn className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleZoomOutLags}
+                  title="Zoom Out (more lags)"
+                  className="p-1 rounded-md transition hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <ZoomOut className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResetLags}
+                  title="Reset Lags (default 24)"
+                  className="p-1 rounded-md transition hover:bg-slate-200 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-[var(--text-secondary)]" />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-1">
+                {[12, 24, 36, 48].map((l) => (
+                  <button
+                    key={l}
+                    onClick={() => setMaxLags(l)}
+                    className={`px-2 py-0.5 text-[10px] font-mono rounded border transition cursor-pointer ${
+                      maxLags === l
+                        ? isDark ? 'bg-blue-600 border-blue-500 text-white font-bold' : 'bg-white border-blue-300 text-blue-700 font-bold shadow-2xs'
+                        : isDark ? 'border-slate-800 text-slate-400 hover:text-slate-200' : 'border-slate-200 text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {l}L
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* ACF Chart Card */}
+            {/* ACF Chart Card with Brush */}
             <div className={`p-5 rounded-2xl border transition ${
               isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
             }`}>
@@ -316,7 +363,7 @@ export const StatisticalTestsPage: React.FC = () => {
                   Bounds: ±{acfPacfResult?.ci_bound?.toFixed(3) ?? '0.196'}
                 </span>
               </div>
-              <div className="h-60 w-full">
+              <div className="h-68 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={acfPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
@@ -336,12 +383,18 @@ export const StatisticalTestsPage: React.FC = () => {
                     <ReferenceLine y={acfPacfResult?.ci_bound || 0.196} stroke="#f59e0b" strokeDasharray="3 3" />
                     <ReferenceLine y={-(acfPacfResult?.ci_bound || 0.196)} stroke="#f59e0b" strokeDasharray="3 3" />
                     <Bar dataKey="val" fill={chartTheme.forecast} />
+                    <Brush
+                      dataKey="lag"
+                      height={20}
+                      stroke={chartTheme.brushStroke}
+                      fill={chartTheme.brushFill}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
 
-            {/* PACF Chart Card */}
+            {/* PACF Chart Card with Brush */}
             <div className={`p-5 rounded-2xl border transition ${
               isDark ? 'bg-slate-900/50 border-slate-800/80' : 'bg-white border-slate-200/90 shadow-xs'
             }`}>
@@ -354,7 +407,7 @@ export const StatisticalTestsPage: React.FC = () => {
                   Order Determination
                 </span>
               </div>
-              <div className="h-60 w-full">
+              <div className="h-68 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={pacfPoints} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={chartTheme.grid} />
@@ -374,6 +427,12 @@ export const StatisticalTestsPage: React.FC = () => {
                     <ReferenceLine y={acfPacfResult?.ci_bound || 0.196} stroke="#f59e0b" strokeDasharray="3 3" />
                     <ReferenceLine y={-(acfPacfResult?.ci_bound || 0.196)} stroke="#f59e0b" strokeDasharray="3 3" />
                     <Bar dataKey="val" fill={chartTheme.actual} />
+                    <Brush
+                      dataKey="lag"
+                      height={20}
+                      stroke={chartTheme.brushStroke}
+                      fill={chartTheme.brushFill}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -403,10 +462,10 @@ export const StatisticalTestsPage: React.FC = () => {
                 text: "If ACF drops sharply after lag q while PACF decays smoothly, a Moving Average MA(q) process is indicated."
               },
               {
-                badge: "ARMA(p, q)",
+                badge: "Interactive Zoom",
                 badgeColor: "purple",
-                label: "Dual Decay",
-                text: "When both ACF and PACF decay gradually without immediate sharp cutoffs, a combined ARMA(p, q) process is appropriate."
+                label: "Lag Range Control",
+                text: "Use the zoom controls or the brush sliders at the bottom to focus on early lags (e.g. 1-12) or inspect long seasonal horizons."
               }
             ]}
             takeaway="Count the number of significant initial spikes in the PACF to select the AR order p, and the spikes in ACF to select the MA order q."
