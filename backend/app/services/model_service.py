@@ -14,6 +14,57 @@ from app.utils.serialization import clean_for_json
 # In-memory store for model fit sessions
 ANALYSES_STORE: Dict[str, Dict[str, Any]] = {}
 
+
+def default_seasonal_period(freq: Optional[str], n: int) -> int:
+    """Maps a pandas inferred frequency string to its natural seasonal period."""
+    f = (freq or "").upper()
+    if f.startswith(("MIN", "T")):
+        period = 60
+    elif f.startswith(("H",)) or f == "BH":
+        period = 24
+    elif f.startswith("B") and not f.startswith("BM") and not f.startswith("BQ"):
+        period = 5
+    elif f.startswith("D"):
+        period = 7
+    elif f.startswith("W"):
+        period = 52
+    elif f.startswith(("M", "BM", "SM")):
+        period = 12
+    elif f.startswith(("Q", "BQ")):
+        period = 4
+    else:
+        period = 12 if n >= 24 else 7
+    # Need at least two full cycles for seasonal estimation
+    if n < 2 * period:
+        period = 7 if n >= 14 else max(2, n // 2)
+    return period
+
+
+def resolve_period(value: Any, freq: Optional[str], n: int) -> int:
+    """Uses an explicit period if provided, otherwise infers from data frequency."""
+    try:
+        if value is not None and value != "auto" and int(value) >= 2:
+            return int(value)
+    except (TypeError, ValueError):
+        pass
+    return default_seasonal_period(freq, n)
+
+
+def resolve_arima_trend(trend: Any, d: int) -> str:
+    """
+    statsmodels ARIMA forbids trend terms of lower order than d.
+    Default: constant for d=0, drift ('t') for d=1, none for d>=2.
+    """
+    if trend in (None, "", "auto"):
+        return "c" if d == 0 else "t" if d == 1 else "n"
+    if d >= 1 and trend == "c":
+        return "t" if d == 1 else "n"
+    if d >= 2 and trend in ("t", "ct"):
+        return "n"
+    if d == 1 and trend == "ct":
+        return "t"
+    return str(trend)
+
 def fit_time_series_model(
     dataset_id: str,
     target_column: str,
@@ -43,6 +94,7 @@ def fit_time_series_model(
         
     df = ds["df"].copy()
     time_col = ds["metadata"]["time_col"]
+    inferred_freq = ds["metadata"].get("inferred_freq")
     
     if target_column not in df.columns:
         raise ValueError(f"Target column '{target_column}' does not exist.")
@@ -88,7 +140,7 @@ def fit_time_series_model(
         param_estimates = {"last_value": float(y[-1])}
         
     elif model_type == "snaive":
-        period = int(parameters.get("period", 12 if n >= 24 else 7))
+        period = resolve_period(parameters.get("period"), inferred_freq, n)
         if n <= period:
             raise ValueError(f"Seasonal Naive requires series length ({n}) > seasonal period ({period}).")
         fitted[period:] = y[:-period]
@@ -174,7 +226,9 @@ def fit_time_series_model(
     elif model_type == "holt_winters":
         trend = parameters.get("trend", "add")
         seasonal = parameters.get("seasonal", "add")
-        period = int(parameters.get("period", 12 if n >= 24 else 7))
+        period = resolve_period(parameters.get("period"), inferred_freq, n)
+        if n < 2 * period:
+            raise ValueError(f"Holt-Winters requires at least two full seasonal cycles ({2 * period} obs) for period {period}; series has {n}.")
         if seasonal == "mul" and (y <= 0).any():
             raise ValueError("Multiplicative seasonality requires all values to be positive (> 0).")
         try:
@@ -214,7 +268,7 @@ def fit_time_series_model(
         p = int(parameters.get("p", 1 if model_type in ["ar", "arma", "arima"] else 0))
         d = int(parameters.get("d", 1 if model_type == "arima" else 0))
         q = int(parameters.get("q", 1 if model_type in ["ma", "arma", "arima"] else 0))
-        trend_cfg = parameters.get("trend", "c" if d == 0 else "n")
+        trend_cfg = resolve_arima_trend(parameters.get("trend"), d)
         
         # Check ARMA stationarity requirement warning
         if model_type in ["ar", "ma", "arma"] and d == 0:
@@ -227,8 +281,12 @@ def fit_time_series_model(
                 pass
                 
         model_fit = ARIMA(y, order=(p, d, q), trend=trend_cfg).fit()
-        fitted = model_fit.fittedvalues
-        residuals = model_fit.resid
+        fitted = np.array(model_fit.fittedvalues, dtype=float)
+        residuals = np.array(model_fit.resid, dtype=float)
+        # First d fitted values are meaningless (differencing burn-in, ~0)
+        if d > 0:
+            fitted[:d] = np.nan
+            residuals[:d] = np.nan
         forecast_res = model_fit.get_forecast(steps=forecast_horizon)
         forecast = forecast_res.predicted_mean
         ci = forecast_res.conf_int(alpha=1.0 - confidence_level)
@@ -252,13 +310,25 @@ def fit_time_series_model(
         P = int(parameters.get("P", 1))
         D = int(parameters.get("D", 0))
         Q = int(parameters.get("Q", 1))
-        s_val = int(parameters.get("s", 12 if n >= 24 else 7))
-        trend_cfg = parameters.get("trend", "c" if (d == 0 and D == 0) else None)
+        s_val = resolve_period(parameters.get("s"), inferred_freq, n)
+        # SARIMAX applies the trend to the differenced series, so 'c' acts as drift when d + D == 1
+        trend_param = parameters.get("trend")
+        if trend_param in (None, "", "auto"):
+            trend_cfg = "c" if (d + D) <= 1 else None
+        else:
+            trend_cfg = None if trend_param == "n" else trend_param
         
         sarima_model = SARIMAX(y, order=(p, d, q), seasonal_order=(P, D, Q, s_val), trend=trend_cfg, enforce_stationarity=False, enforce_invertibility=False)
         model_fit = sarima_model.fit(disp=False)
-        fitted = model_fit.fittedvalues
-        residuals = model_fit.resid
+        fitted = np.array(model_fit.fittedvalues, dtype=float)
+        residuals = np.array(model_fit.resid, dtype=float)
+        # Mask differencing / diffuse-initialization burn-in (fitted ~0 there)
+        burn = max(d + D * s_val, int(getattr(model_fit, "loglikelihood_burn", 0) or 0))
+        burn = min(burn, n - 1)
+        if burn > 0:
+            fitted[:burn] = np.nan
+            residuals[:burn] = np.nan
+        param_estimates_extra = {"seasonal_period": s_val}
         forecast_res = model_fit.get_forecast(steps=forecast_horizon)
         forecast = forecast_res.predicted_mean
         ci = forecast_res.conf_int(alpha=1.0 - confidence_level)
@@ -268,6 +338,7 @@ def fit_time_series_model(
         model_df_val = p + q + P + Q
         p_names = getattr(model_fit, "param_names", [f"param_{i}" for i in range(len(model_fit.params))])
         param_estimates = {str(k): round(float(v), 5) for k, v in zip(p_names, model_fit.params)}
+        param_estimates.update(param_estimates_extra)
         ic_dict = {
             "aic": float(model_fit.aic),
             "bic": float(model_fit.bic),
@@ -462,7 +533,7 @@ x = np.arange(len(y))
 slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
 future_x = np.arange(len(y), len(y) + {horizon})
 forecast = slope * future_x + intercept
-print(f"Fitted trend: y = {intercept:.4f} + {slope:.4f} * t (R² = {r_value**2:.4f})")
+print(f"Fitted trend: y = {{intercept:.4f}} + {{slope:.4f}} * t (R² = {{r_value**2:.4f}})")
 print("Forecasted values:", forecast)
 """
     elif model_type == "naive":

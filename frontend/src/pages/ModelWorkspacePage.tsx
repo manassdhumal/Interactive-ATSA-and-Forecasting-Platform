@@ -15,6 +15,7 @@ import {
 import { ChartExplanation } from '../components/common/ChartExplanation';
 import { TimeZoomControls } from '../components/common/TimeZoomControls';
 import { ModelFittedExplanation } from '../components/common/ModelFittedExplanation';
+import { withSeasonalDefaults } from '../utils/seasonality';
 
 interface ModelConfig {
   title: string;
@@ -172,11 +173,22 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     title: 'Autoregressive Integrated Moving Average — ARIMA(p, d, q)',
     math: 'Φ(B)(1 - B)^d Y_t = c + Θ(B) ε_t',
     description: 'General classical model for non-stationary series stationarized through order-d differencing.',
-    defaultParams: { p: 1, d: 1, q: 1, trend: 'n' },
+    defaultParams: { p: 1, d: 1, q: 1, trend: 'auto' },
     paramFields: [
       { key: 'p', label: 'AR Order (p)', type: 'number', min: 0, max: 8 },
       { key: 'd', label: 'Differencing Order (d)', type: 'number', min: 0, max: 2 },
-      { key: 'q', label: 'MA Order (q)', type: 'number', min: 0, max: 8 }
+      { key: 'q', label: 'MA Order (q)', type: 'number', min: 0, max: 8 },
+      {
+        key: 'trend',
+        label: 'Drift / Trend',
+        type: 'select',
+        options: [
+          { label: 'Auto (drift when d = 1)', value: 'auto' },
+          { label: "Drift / Linear ('t')", value: 't' },
+          { label: "Constant ('c', d = 0 only)", value: 'c' },
+          { label: "None ('n')", value: 'n' }
+        ]
+      }
     ]
   },
   sarima: {
@@ -201,8 +213,12 @@ export const ModelWorkspacePage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
   const { isDark, chartTheme } = useTheme();
   const config = MODEL_CONFIGS[modelType] || MODEL_CONFIGS['arma'];
+  const defaultParams = useMemo(
+    () => withSeasonalDefaults(config.defaultParams, selectedDataset?.inferred_freq, selectedDataset?.total_rows ?? 0),
+    [config, selectedDataset?.inferred_freq, selectedDataset?.total_rows]
+  );
 
-  const [parameters, setParameters] = useState<Record<string, any>>(config.defaultParams);
+  const [parameters, setParameters] = useState<Record<string, any>>(defaultParams);
   const [forecastHorizon, setForecastHorizon] = useState(12);
   const [confidenceLevel, setConfidenceLevel] = useState(0.95);
   const [fitResult, setFitResult] = useState<ModelFitResult | null>(null);
@@ -218,14 +234,14 @@ export const ModelWorkspacePage: React.FC = () => {
   const [forecastZoomCount, setForecastZoomCount] = useState<number>(0);
   const [residualZoomCount, setResidualZoomCount] = useState<number>(0);
 
-  // Sync default parameters when switching models
+  // Sync default parameters when switching models or datasets
   React.useEffect(() => {
-    setParameters(config.defaultParams);
+    setParameters(defaultParams);
     setFitResult(null);
     setErrorMsg(null);
     setForecastZoomCount(0);
     setResidualZoomCount(0);
-  }, [modelType]);
+  }, [modelType, defaultParams]);
 
   const handleAutoArimaSearch = async () => {
     if (!selectedDataset || !selectedTarget) return;
@@ -272,29 +288,32 @@ export const ModelWorkspacePage: React.FC = () => {
       actual: fitResult.actual[idx],
       fitted: fitResult.fitted[idx],
       forecast: null as number | null,
-      lower: null as number | null,
-      upper: null as number | null
+      band: null as [number, number] | null
     }));
 
-    const future = fitResult.forecast_timestamps.map((t, idx) => ({
-      time: t.slice(0, 10),
-      actual: null as number | null,
-      fitted: null as number | null,
-      forecast: fitResult.forecast[idx],
-      lower: fitResult.lower_interval[idx],
-      upper: fitResult.upper_interval[idx]
-    }));
+    const future = fitResult.forecast_timestamps.map((t, idx) => {
+      const lo = fitResult.lower_interval[idx];
+      const hi = fitResult.upper_interval[idx];
+      return {
+        time: t.slice(0, 10),
+        actual: null as number | null,
+        fitted: null as number | null,
+        forecast: fitResult.forecast[idx],
+        band: lo != null && hi != null ? ([lo, hi] as [number, number]) : null
+      };
+    });
 
     if (historical.length > 0 && future.length > 0) {
       const lastHist = historical[historical.length - 1];
       future.unshift({
         time: lastHist.time,
         actual: lastHist.actual,
-        fitted: null,
+        fitted: lastHist.fitted,
         forecast: lastHist.actual,
-        lower: lastHist.actual,
-        upper: lastHist.actual
+        band: [lastHist.actual, lastHist.actual]
       });
+      // Avoid duplicate category: drop the bridge point's actual from the historical row
+      historical.pop();
     }
 
     return [...historical, ...future];
@@ -384,7 +403,7 @@ export const ModelWorkspacePage: React.FC = () => {
               </button>
             )}
             <button
-              onClick={() => setParameters(config.defaultParams)}
+              onClick={() => setParameters(defaultParams)}
               className={`px-3 py-1.5 rounded-xl border text-xs font-medium flex items-center gap-1.5 transition cursor-pointer ${
                 isDark
                   ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
@@ -599,8 +618,7 @@ export const ModelWorkspacePage: React.FC = () => {
                         boxShadow: chartTheme.tooltipShadow
                       }}
                     />
-                    <Area type="monotone" dataKey="upper" stroke="none" fill={chartTheme.confidenceFill} />
-                    <Area type="monotone" dataKey="lower" stroke="none" fill={chartTheme.confidenceFill} />
+                    <Area type="monotone" dataKey="band" stroke="none" fill={chartTheme.confidenceFill} name="Interval" />
                     <Line type="monotone" dataKey="actual" stroke={chartTheme.actual} strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="fitted" stroke={chartTheme.fitted} strokeWidth={1.5} dot={false} />
                     <Line type="monotone" dataKey="forecast" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />

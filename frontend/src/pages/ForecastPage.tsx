@@ -10,6 +10,7 @@ import {
 import { Download, Play } from 'lucide-react';
 import { ChartExplanation } from '../components/common/ChartExplanation';
 import { TimeZoomControls } from '../components/common/TimeZoomControls';
+import { getDefaultSeasonalPeriod } from '../utils/seasonality';
 
 export const ForecastPage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
@@ -25,17 +26,18 @@ export const ForecastPage: React.FC = () => {
     if (!selectedDataset || !selectedTarget) return;
     setLoading(true);
     try {
+      const period = getDefaultSeasonalPeriod(selectedDataset.inferred_freq, selectedDataset.total_rows ?? 0);
       const defaultParams: Record<string, any> = {
         naive: {},
         linear_trend: {},
         ses: { alpha: 'auto' },
         holt: { alpha: 'auto', beta: 'auto' },
-        holt_winters: { trend: 'add', seasonal: 'add', period: 12 },
+        holt_winters: { trend: 'add', seasonal: 'add', period },
         ar: { p: 1, trend: 'c' },
         ma: { q: 1, trend: 'c' },
         arma: { p: 1, q: 1, trend: 'c' },
-        arima: { p: 1, d: 1, q: 1 },
-        sarima: { p: 1, d: 0, q: 1, P: 1, D: 0, Q: 1, s: 12 }
+        arima: { p: 1, d: 1, q: 1, trend: 'auto' },
+        sarima: { p: 1, d: 0, q: 1, P: 1, D: 0, Q: 1, s: period }
       };
 
       const res = await apiService.fitModel(
@@ -62,26 +64,27 @@ export const ForecastPage: React.FC = () => {
       time: t.slice(0, 10),
       actual: fitResult.actual[idx],
       forecast: null as number | null,
-      lower: null as number | null,
-      upper: null as number | null
+      band: null as [number, number] | null
     }));
 
-    const future = fitResult.forecast_timestamps.map((t, idx) => ({
-      time: t.slice(0, 10),
-      actual: null as number | null,
-      forecast: fitResult.forecast[idx],
-      lower: fitResult.lower_interval[idx],
-      upper: fitResult.upper_interval[idx]
-    }));
+    const future = fitResult.forecast_timestamps.map((t, idx) => {
+      const lo = fitResult.lower_interval[idx];
+      const hi = fitResult.upper_interval[idx];
+      return {
+        time: t.slice(0, 10),
+        actual: null as number | null,
+        forecast: fitResult.forecast[idx],
+        band: lo != null && hi != null ? ([lo, hi] as [number, number]) : null
+      };
+    });
 
     if (historical.length > 0 && future.length > 0) {
-      const lastHist = historical[historical.length - 1];
+      const lastHist = historical.pop()!;
       future.unshift({
         time: lastHist.time,
         actual: lastHist.actual,
         forecast: lastHist.actual,
-        lower: lastHist.actual,
-        upper: lastHist.actual
+        band: [lastHist.actual, lastHist.actual]
       });
     }
 
@@ -243,8 +246,7 @@ export const ForecastPage: React.FC = () => {
                       boxShadow: chartTheme.tooltipShadow
                     }}
                   />
-                  <Area type="monotone" dataKey="upper" stroke="none" fill={chartTheme.confidenceFill} />
-                  <Area type="monotone" dataKey="lower" stroke="none" fill={chartTheme.confidenceFill} />
+                  <Area type="monotone" dataKey="band" stroke="none" fill={chartTheme.confidenceFill} name="Interval" />
                   <Line type="monotone" dataKey="actual" stroke={chartTheme.actual} strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="forecast" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />
                   <Brush dataKey="time" height={20} stroke={chartTheme.brushStroke} fill={chartTheme.brushFill} tickFormatter={(t) => t.slice(5, 10)} />

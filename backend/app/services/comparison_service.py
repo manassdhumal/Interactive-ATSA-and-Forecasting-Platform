@@ -80,11 +80,11 @@ def compare_models(
                 fit_m = ARIMA(y_train, order=(1, 0, 1), trend="c").fit()
                 preds = fit_m.forecast(steps=test_size)
             elif key == "arima":
-                fit_m = ARIMA(y_train, order=(1, 1, 1)).fit()
+                fit_m = ARIMA(y_train, order=(1, 1, 1), trend="t").fit()
                 preds = fit_m.forecast(steps=test_size)
             elif key == "sarima":
                 p_val = seasonal_period if len(y_train) >= 2 * seasonal_period else 7
-                fit_m = SARIMAX(y_train, order=(1, 1, 1), seasonal_order=(1, 0, 0, p_val), enforce_stationarity=False, enforce_invertibility=False).fit(disp=False)
+                fit_m = SARIMAX(y_train, order=(1, 1, 1), seasonal_order=(1, 0, 0, p_val), trend="c", enforce_stationarity=False, enforce_invertibility=False).fit(disp=False)
                 preds = fit_m.forecast(steps=test_size)
             else:
                 continue
