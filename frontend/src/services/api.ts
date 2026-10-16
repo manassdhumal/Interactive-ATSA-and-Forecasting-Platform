@@ -2,7 +2,7 @@ import axios from 'axios';
 import {
   DatasetMetadata, DescriptiveStats, RollingTrendData,
   DecompositionData, ADFResult, ACFPACFResult,
-  ModelFitResult, ModelComparisonResult
+  ModelFitResult, ModelComparisonResult, ExecutiveReportData
 } from '../types';
 
 const api = axios.create({
@@ -100,5 +100,13 @@ export const apiService = {
       model_keys,
       test_size,
       seasonal_period
-    }).then(r => r.data)
+    }).then(r => r.data),
+
+  // Reports
+  getExecutiveReport: (dataset_id: string, target_column: string, horizon = 12) =>
+    api.get<ExecutiveReportData>(`/reports/executive/${dataset_id}/${target_column}?horizon=${horizon}`).then(r => r.data),
+  getExecutiveReportHtmlUrl: (dataset_id: string, target_column: string, horizon = 12) =>
+    `/api/reports/executive/${dataset_id}/${target_column}/html?horizon=${horizon}`,
+  getExecutiveReportDownloadHtmlUrl: (dataset_id: string, target_column: string, horizon = 12) =>
+    `/api/reports/executive/${dataset_id}/${target_column}/download-html?horizon=${horizon}`
 };

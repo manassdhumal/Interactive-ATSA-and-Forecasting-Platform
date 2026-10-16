@@ -141,6 +141,23 @@ def test_seasonal_auto_arima():
     assert res.get("is_seasonal") is True
     assert len(res["top_candidates"]) > 0
 
+def test_executive_report():
+    response = client.get("/api/reports/executive/sample-seasonal-monthly/sales?horizon=12")
+    assert response.status_code == 200
+    res = response.json()
+    assert "executive_summary" in res
+    assert "descriptive_statistics" in res
+    assert "hypothesis_tests" in res
+    assert "model_tournament" in res
+    assert "forecast_table" in res
+    assert len(res["forecast_table"]) == 12
+
+    # Test HTML report endpoint
+    html_res = client.get("/api/reports/executive/sample-seasonal-monthly/sales/html?horizon=12")
+    assert html_res.status_code == 200
+    assert "text/html" in html_res.headers["content-type"]
+    assert "ATSA Executive Report" in html_res.text
+
 def test_delete_dataset():
     # Test deleting a dataset
     del_res = client.delete("/api/datasets/sample-daily-demand")

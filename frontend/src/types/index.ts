@@ -150,3 +150,48 @@ export interface ModelComparisonResult {
   best_model: string | null;
   failed_models: { model: string; error: string }[];
 }
+
+export interface ExecutiveReportData {
+  dataset_id: string;
+  dataset_name: string;
+  target_column: string;
+  total_observations: number;
+  inferred_frequency: string;
+  seasonal_period: number;
+  date_range: string[];
+  generated_at: string;
+  executive_summary: string;
+  descriptive_statistics: DescriptiveStats;
+  hypothesis_tests: {
+    adf: ADFResult;
+    kpss: ADFResult;
+  };
+  model_tournament: {
+    test_size: number;
+    champion_model: string;
+    comparison_table: {
+      model: string;
+      label: string;
+      mae: number | null;
+      rmse: number | null;
+      mape: number | null;
+      smape: number | null;
+      mase: number | null;
+    }[];
+  };
+  champion_model: {
+    label: string;
+    model_type: string;
+    param_estimates: Record<string, any>;
+    metrics: Record<string, any>;
+    diagnostics: Record<string, any>;
+  };
+  forecast_horizon: number;
+  forecast_table: {
+    step: number;
+    timestamp: string;
+    point_forecast: number | null;
+    lower_95: number | null;
+    upper_95: number | null;
+  }[];
+}

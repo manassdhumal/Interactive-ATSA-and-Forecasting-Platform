@@ -20,6 +20,7 @@ from app.services.exploration_service import (
 from app.services.diagnostic_service import compute_adf_test, compute_kpss_test, compute_acf_pacf
 from app.services.model_service import fit_time_series_model, get_analysis_result, search_optimal_arima
 from app.services.comparison_service import compare_models
+from app.services.report_service import generate_executive_report_data, build_standalone_html_report
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -233,6 +234,36 @@ def compare_models_endpoint(req: ModelComparisonRequest):
             model_keys=req.model_keys,
             test_size=req.test_size,
             seasonal_period=req.seasonal_period
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# Executive Report Endpoints
+@app.get("/api/reports/executive/{dataset_id}/{target_column}")
+def executive_report_endpoint(dataset_id: str, target_column: str, horizon: int = 12):
+    try:
+        return generate_executive_report_data(dataset_id, target_column, forecast_horizon=horizon)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/reports/executive/{dataset_id}/{target_column}/html")
+def executive_report_html_endpoint(dataset_id: str, target_column: str, horizon: int = 12):
+    try:
+        data = generate_executive_report_data(dataset_id, target_column, forecast_horizon=horizon)
+        html_content = build_standalone_html_report(data)
+        return Response(content=html_content, media_type="text/html")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.get("/api/reports/executive/{dataset_id}/{target_column}/download-html")
+def download_executive_report_html(dataset_id: str, target_column: str, horizon: int = 12):
+    try:
+        data = generate_executive_report_data(dataset_id, target_column, forecast_horizon=horizon)
+        html_content = build_standalone_html_report(data)
+        return Response(
+            content=html_content.encode("utf-8"),
+            media_type="text/html",
+            headers={"Content-Disposition": f"attachment; filename=ATSA_Executive_Report_{dataset_id}_{target_column}.html"}
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
