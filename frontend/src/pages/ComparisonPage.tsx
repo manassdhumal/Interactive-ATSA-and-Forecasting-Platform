@@ -12,23 +12,25 @@ import { ChartExplanation } from '../components/common/ChartExplanation';
 import { TimeZoomControls } from '../components/common/TimeZoomControls';
 
 const CANDIDATE_MODELS = [
-  { key: 'naive', label: 'Naive Baseline' },
+  { key: 'auto', label: '✨ Auto Best Model' },
+  { key: 'sarima', label: 'SARIMA (Seasonal)' },
+  { key: 'holt_winters', label: 'Holt-Winters' },
+  { key: 'snaive', label: 'Seasonal Naive' },
+  { key: 'arima', label: 'ARIMA(1, 1, 1)' },
+  { key: 'holt', label: "Holt's Linear" },
   { key: 'linear_trend', label: 'Linear Trend' },
   { key: 'ses', label: 'SES Exponential' },
-  { key: 'holt', label: "Holt's Linear" },
-  { key: 'holt_winters', label: 'Holt-Winters' },
-  { key: 'ar', label: 'AR(1) Autoregressive' },
-  { key: 'ma', label: 'MA(1) Moving Average' },
   { key: 'arma', label: 'ARMA(1, 1)' },
-  { key: 'arima', label: 'ARIMA(1, 1, 1)' },
-  { key: 'sarima', label: 'SARIMA' }
+  { key: 'ar', label: 'AR(1)' },
+  { key: 'ma', label: 'MA(1)' },
+  { key: 'naive', label: 'Naive Baseline' }
 ];
 
 export const ComparisonPage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
   const { isDark, chartTheme } = useTheme();
   const [selectedKeys, setSelectedKeys] = useState<string[]>([
-    'naive', 'linear_trend', 'ses', 'holt', 'ar', 'arma', 'arima'
+    'auto', 'sarima', 'holt_winters', 'arima', 'linear_trend', 'naive'
   ]);
   const [testSize, setTestSize] = useState(14);
   const [seasonalPeriod, setSeasonalPeriod] = useState(12);
@@ -91,16 +93,18 @@ export const ComparisonPage: React.FC = () => {
 
   const modelColors: Record<string, string> = {
     Actual: chartTheme.actual,
-    NAIVE: '#94a3b8',
-    LINEAR_TREND: '#10b981',
-    SES: '#f59e0b',
-    HOLT: '#ec4899',
+    AUTO: '#3b82f6',
+    SARIMA: '#eab308',
     HOLT_WINTERS: '#8b5cf6',
-    AR: '#06b6d4',
-    MA: '#14b8a6',
-    ARMA: '#6366f1',
+    SNAIVE: '#10b981',
     ARIMA: '#f43f5e',
-    SARIMA: '#eab308'
+    HOLT: '#ec4899',
+    LINEAR_TREND: '#06b6d4',
+    SES: '#f59e0b',
+    ARMA: '#6366f1',
+    AR: '#14b8a6',
+    MA: '#64748b',
+    NAIVE: '#94a3b8'
   };
 
   return (

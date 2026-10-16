@@ -1,4 +1,5 @@
 import pytest
+import numpy as np
 from fastapi.testclient import TestClient
 from app.main import app
 
@@ -112,6 +113,33 @@ def test_model_comparison():
     assert "comparison_table" in res
     assert len(res["comparison_table"]) >= 3
     assert res["best_model"] is not None
+
+def test_model_fitting_auto():
+    response = client.post("/api/models/fit", json={
+        "dataset_id": "sample-seasonal-monthly",
+        "target_column": "sales",
+        "model": "auto",
+        "parameters": {},
+        "forecast_horizon": 12
+    })
+    assert response.status_code == 200
+    res = response.json()
+    assert res["model"] == "auto"
+    assert len(res["forecast"]) == 12
+    # Ensure forecast is not a flat straight line
+    forecast = res["forecast"]
+    assert np.std(forecast) > 0.5
+    assert "chosen_model" in res["param_estimates"]
+
+def test_seasonal_auto_arima():
+    response = client.get("/api/models/auto-arima/sample-seasonal-monthly/sales?seasonal=true&s=12")
+    assert response.status_code == 200
+    res = response.json()
+    assert "best_p" in res
+    assert "best_d" in res
+    assert "best_q" in res
+    assert res.get("is_seasonal") is True
+    assert len(res["top_candidates"]) > 0
 
 def test_delete_dataset():
     # Test deleting a dataset

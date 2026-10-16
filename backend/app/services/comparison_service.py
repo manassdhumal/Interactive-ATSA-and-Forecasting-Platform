@@ -47,6 +47,9 @@ def compare_models(
             preds = None
             if key == "naive":
                 preds = np.full(test_size, y_train[-1])
+            elif key == "snaive":
+                p_val = seasonal_period if len(y_train) > seasonal_period else 7
+                preds = np.array([y_train[-p_val + (h % p_val)] for h in range(test_size)])
             elif key == "linear_trend":
                 from scipy import stats
                 slope, intercept, _, _, _ = stats.linregress(np.arange(len(y_train)), y_train)
@@ -80,14 +83,39 @@ def compare_models(
                 fit_m = ARIMA(y_train, order=(1, 0, 1), trend="c").fit()
                 preds = fit_m.forecast(steps=test_size)
             elif key == "arima":
-                fit_m = ARIMA(y_train, order=(1, 1, 1), trend="t").fit()
+                fit_m = ARIMA(y_train, order=(1, 1, 1)).fit()
                 preds = fit_m.forecast(steps=test_size)
             elif key == "sarima":
                 p_val = seasonal_period if len(y_train) >= 2 * seasonal_period else 7
-                fit_m = SARIMAX(y_train, order=(1, 1, 1), seasonal_order=(1, 0, 0, p_val), trend="c", enforce_stationarity=False, enforce_invertibility=False).fit(disp=False)
+                try:
+                    fit_m = SARIMAX(y_train, order=(0, 1, 1), seasonal_order=(0, 1, 1, p_val), trend=None, enforce_stationarity=False, enforce_invertibility=False).fit(disp=False, maxiter=50)
+                except Exception:
+                    fit_m = SARIMAX(y_train, order=(1, 1, 1), seasonal_order=(1, 0, 1, p_val), trend=None, enforce_stationarity=False, enforce_invertibility=False).fit(disp=False, maxiter=50)
                 preds = fit_m.forecast(steps=test_size)
-            else:
-                continue
+            elif key == "auto":
+                p_val = seasonal_period if len(y_train) >= 2 * seasonal_period else 7
+                is_s = (len(y_train) >= 2 * p_val and p_val >= 2)
+                cand_list = []
+                if is_s:
+                    try:
+                        hw_fit = ExponentialSmoothing(y_train, trend="add", seasonal="add", seasonal_periods=p_val, initialization_method="estimated").fit()
+                        cand_list.append((hw_fit.forecast(test_size), float(hw_fit.aic)))
+                    except Exception:
+                        pass
+                    try:
+                        sm_fit = SARIMAX(y_train, order=(0, 1, 1), seasonal_order=(0, 1, 1, p_val), trend=None, enforce_stationarity=False, enforce_invertibility=False).fit(disp=False, maxiter=45)
+                        cand_list.append((sm_fit.forecast(steps=test_size), float(sm_fit.aic)))
+                    except Exception:
+                        pass
+                try:
+                    ar_fit = ARIMA(y_train, order=(1, 1, 1)).fit()
+                    cand_list.append((ar_fit.forecast(steps=test_size), float(ar_fit.aic)))
+                except Exception:
+                    pass
+                if cand_list:
+                    preds = min(cand_list, key=lambda x: x[1])[0]
+                else:
+                    preds = np.full(test_size, y_train[-1])
                 
             metrics = compute_metrics(y_test, preds, naive_series=y_train)
             predictions_map[key] = [float(p) for p in preds]

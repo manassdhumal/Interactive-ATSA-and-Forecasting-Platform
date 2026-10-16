@@ -7,7 +7,7 @@ import {
   XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, AreaChart, Area, Line, Brush
 } from 'recharts';
-import { Download, Play } from 'lucide-react';
+import { Download, Play, Sparkles, Info } from 'lucide-react';
 import { ChartExplanation } from '../components/common/ChartExplanation';
 import { TimeZoomControls } from '../components/common/TimeZoomControls';
 import { getDefaultSeasonalPeriod } from '../utils/seasonality';
@@ -15,7 +15,7 @@ import { getDefaultSeasonalPeriod } from '../utils/seasonality';
 export const ForecastPage: React.FC = () => {
   const { selectedDataset, selectedTarget } = useApp();
   const { isDark, chartTheme } = useTheme();
-  const [modelType, setModelType] = useState('sarima');
+  const [modelType, setModelType] = useState('auto');
   const [horizon, setHorizon] = useState(24);
   const [confidenceLevel, setConfidenceLevel] = useState(0.95);
   const [fitResult, setFitResult] = useState<ModelFitResult | null>(null);
@@ -28,6 +28,7 @@ export const ForecastPage: React.FC = () => {
     try {
       const period = getDefaultSeasonalPeriod(selectedDataset.inferred_freq, selectedDataset.total_rows ?? 0);
       const defaultParams: Record<string, any> = {
+        auto: {},
         naive: {},
         linear_trend: {},
         ses: { alpha: 'auto' },
@@ -37,7 +38,7 @@ export const ForecastPage: React.FC = () => {
         ma: { q: 1, trend: 'c' },
         arma: { p: 1, q: 1, trend: 'c' },
         arima: { p: 1, d: 1, q: 1, trend: 'auto' },
-        sarima: { p: 1, d: 0, q: 1, P: 1, D: 0, Q: 1, s: period }
+        sarima: { p: 1, d: 1, q: 1, P: 1, D: 1, Q: 1, s: period }
       };
 
       const res = await apiService.fitModel(
@@ -125,10 +126,11 @@ export const ForecastPage: React.FC = () => {
                 isDark ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-slate-200 text-slate-800'
               }`}
             >
+              <option value="auto">✨ Auto (Best Fit & Highest Accuracy)</option>
               <option value="sarima">SARIMA (Seasonal Multiplicative)</option>
+              <option value="holt_winters">Holt-Winters Exponential Smoothing</option>
               <option value="arima">ARIMA(p, d, q)</option>
               <option value="arma">ARMA(p, q)</option>
-              <option value="holt_winters">Holt-Winters Exponential Smoothing</option>
               <option value="holt">Holt's Linear Trend</option>
               <option value="ses">Simple Exp. Smoothing (SES)</option>
               <option value="ar">AR(p) Autoregressive</option>
@@ -177,6 +179,47 @@ export const ForecastPage: React.FC = () => {
           {loading ? 'Forecasting...' : 'Compute Forecast'}
         </button>
       </div>
+
+      {/* Baseline mathematical explanation alert */}
+      {(modelType === 'naive' || modelType === 'ses' || modelType === 'linear_trend' || modelType === 'holt') && (
+        <div className={`p-3.5 rounded-xl border text-xs flex items-center gap-2.5 transition ${
+          isDark ? 'bg-amber-950/20 border-amber-800/40 text-amber-200' : 'bg-amber-50/80 border-amber-200 text-amber-900'
+        }`}>
+          <Info className="w-4 h-4 text-amber-500 shrink-0" />
+          <span>
+            <strong>Note on {modelType.replace('_', ' ').toUpperCase()}:</strong> By theoretical formulation, this baseline method produces a constant horizontal or straight-slope line. For realistic fluctuating patterns and cyclical seasonality, select <strong>✨ Auto</strong>, <strong>SARIMA</strong>, or <strong>Holt-Winters</strong>.
+          </span>
+        </div>
+      )}
+
+      {/* Auto Model Winner Badge */}
+      {fitResult && (fitResult.param_estimates?.chosen_model_label || fitResult.model === 'auto') && (
+        <div className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 text-xs transition ${
+          isDark ? 'bg-blue-950/30 border-blue-800/50 text-blue-200' : 'bg-blue-50/80 border-blue-200 text-blue-900 shadow-xs'
+        }`}>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-blue-500 shrink-0" />
+            <span>
+              <strong>Auto Tournament Selected Architecture:</strong>{' '}
+              <span className="font-semibold text-blue-600 dark:text-cyan-300">
+                {fitResult.param_estimates?.chosen_model_label || fitResult.model.toUpperCase()}
+              </span>
+            </span>
+          </div>
+          {fitResult.metrics?.mape !== null && fitResult.metrics?.mape !== undefined && (
+            <div className="flex items-center gap-2 font-mono text-[11px]">
+              <span className="bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded font-semibold text-blue-600 dark:text-cyan-300">
+                In-sample MAPE: {fitResult.metrics.mape}%
+              </span>
+              {fitResult.metrics.aic != null && (
+                <span className="bg-slate-500/10 border border-slate-500/20 px-2 py-0.5 rounded text-[var(--text-secondary)]">
+                  AIC: {Number(fitResult.metrics.aic).toFixed(1)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Forecast Chart with Time Zoom & Brush */}
       {fitResult && (

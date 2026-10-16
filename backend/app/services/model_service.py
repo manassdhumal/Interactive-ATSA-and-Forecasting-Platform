@@ -50,13 +50,28 @@ def resolve_period(value: Any, freq: Optional[str], n: int) -> int:
     return default_seasonal_period(freq, n)
 
 
-def resolve_arima_trend(trend: Any, d: int) -> str:
+def resolve_arima_trend(trend: Any, d: int, y: Optional[np.ndarray] = None) -> str:
     """
     statsmodels ARIMA forbids trend terms of lower order than d.
-    Default: constant for d=0, drift ('t') for d=1, none for d>=2.
+    If trend is auto and d=1: only add drift ('t') if difference series has statistically
+    significant non-zero mean drift (t-test p < 0.05). Otherwise use 'n' (no drift)
+    to prevent forced straight sloping ramps.
     """
     if trend in (None, "", "auto"):
-        return "c" if d == 0 else "t" if d == 1 else "n"
+        if d == 0:
+            return "c"
+        elif d == 1:
+            if y is not None and len(y) > 10:
+                diff_vals = np.diff(y)
+                std_diff = np.std(diff_vals, ddof=1)
+                if std_diff > 1e-9:
+                    t_stat = np.mean(diff_vals) / (std_diff / np.sqrt(len(diff_vals)))
+                    # Two-tailed p-value < 0.05 (|t| > 1.96) indicates meaningful drift
+                    if abs(t_stat) > 1.96:
+                        return "t"
+            return "n"
+        else:
+            return "n"
     if d >= 1 and trend == "c":
         return "t" if d == 1 else "n"
     if d >= 2 and trend in ("t", "ct"):
@@ -268,7 +283,7 @@ def fit_time_series_model(
         p = int(parameters.get("p", 1 if model_type in ["ar", "arma", "arima"] else 0))
         d = int(parameters.get("d", 1 if model_type == "arima" else 0))
         q = int(parameters.get("q", 1 if model_type in ["ma", "arma", "arima"] else 0))
-        trend_cfg = resolve_arima_trend(parameters.get("trend"), d)
+        trend_cfg = resolve_arima_trend(parameters.get("trend"), d, y)
         
         # Check ARMA stationarity requirement warning
         if model_type in ["ar", "ma", "arma"] and d == 0:
@@ -304,22 +319,44 @@ def fit_time_series_model(
         }
 
     elif model_type == "sarima":
+        s_val = resolve_period(parameters.get("s"), inferred_freq, n)
+        
+        # Determine d and D with intelligent defaults if omitted or 'auto'
+        d_param = parameters.get("d")
+        D_param = parameters.get("D")
+        if d_param in (None, "", "auto"):
+            from statsmodels.tsa.stattools import adfuller
+            try:
+                adf_p = adfuller(y)[:2][1]
+                d = 0 if adf_p < 0.05 else 1
+            except Exception:
+                d = 1
+        else:
+            d = int(d_param)
+
+        if D_param in (None, "", "auto"):
+            D = 1 if (n >= 2 * s_val and s_val >= 2) else 0
+        else:
+            D = int(D_param)
+
         p = int(parameters.get("p", 1))
-        d = int(parameters.get("d", 0))
         q = int(parameters.get("q", 1))
         P = int(parameters.get("P", 1))
-        D = int(parameters.get("D", 0))
         Q = int(parameters.get("Q", 1))
-        s_val = resolve_period(parameters.get("s"), inferred_freq, n)
-        # SARIMAX applies the trend to the differenced series, so 'c' acts as drift when d + D == 1
+
+        # Default trend: when differencing (d + D >= 1), omit constant/drift unless explicitly requested
         trend_param = parameters.get("trend")
         if trend_param in (None, "", "auto"):
-            trend_cfg = "c" if (d + D) <= 1 else None
+            trend_cfg = None if (d + D) >= 1 else "c"
         else:
             trend_cfg = None if trend_param == "n" else trend_param
         
         sarima_model = SARIMAX(y, order=(p, d, q), seasonal_order=(P, D, Q, s_val), trend=trend_cfg, enforce_stationarity=False, enforce_invertibility=False)
-        model_fit = sarima_model.fit(disp=False)
+        try:
+            model_fit = sarima_model.fit(disp=False, maxiter=50)
+        except Exception:
+            model_fit = sarima_model.fit(disp=False, method="nm", maxiter=80)
+
         fitted = np.array(model_fit.fittedvalues, dtype=float)
         residuals = np.array(model_fit.resid, dtype=float)
         # Mask differencing / diffuse-initialization burn-in (fitted ~0 there)
@@ -344,6 +381,104 @@ def fit_time_series_model(
             "bic": float(model_fit.bic),
             "log_likelihood": float(model_fit.llf)
         }
+
+    elif model_type == "auto":
+        s_val = resolve_period(parameters.get("s"), inferred_freq, n)
+        is_seasonal = bool(s_val >= 2 and n >= 2 * s_val)
+        
+        # 1. Run Auto-SARIMA search
+        auto_res = search_optimal_arima(dataset_id, target_column, max_p=2, max_d=1, max_q=2, seasonal=is_seasonal, s=s_val)
+        best_p = auto_res["best_p"]
+        best_d = auto_res["best_d"]
+        best_q = auto_res["best_q"]
+        best_P = auto_res.get("best_P", 0)
+        best_D = auto_res.get("best_D", 0)
+        best_Q = auto_res.get("best_Q", 0)
+        best_s = auto_res.get("best_s", s_val)
+        
+        chosen_type = "sarima" if is_seasonal and (best_P > 0 or best_D > 0 or best_Q > 0) else "arima"
+        chosen_label = f"SARIMA({best_p}, {best_d}, {best_q})({best_P}, {best_D}, {best_Q})[{best_s}]" if chosen_type == "sarima" else f"ARIMA({best_p}, {best_d}, {best_q})"
+        
+        # Check candidate architectures (SARIMA vs Holt-Winters / Holt)
+        candidate_models = {}
+        if is_seasonal:
+            trend_cfg = None if (best_d + best_D) >= 1 else "c"
+            sarima_cand = SARIMAX(y, order=(best_p, best_d, best_q), seasonal_order=(best_P, best_D, best_Q, best_s), trend=trend_cfg, enforce_stationarity=False, enforce_invertibility=False)
+            try:
+                fit_cand = sarima_cand.fit(disp=False, maxiter=45)
+                candidate_models["sarima"] = (fit_cand, float(fit_cand.aic), chosen_label, chosen_type)
+            except Exception:
+                pass
+                
+            try:
+                hw_cand = ExponentialSmoothing(y, trend="add", seasonal="add", seasonal_periods=s_val, initialization_method="estimated").fit()
+                candidate_models["hw"] = (hw_cand, float(hw_cand.aic), f"Holt-Winters Additive Seasonality (Period: {s_val})", "holt_winters")
+            except Exception:
+                pass
+        else:
+            try:
+                arima_cand = ARIMA(y, order=(best_p, best_d, best_q), trend=resolve_arima_trend("auto", best_d, y)).fit()
+                candidate_models["arima"] = (arima_cand, float(arima_cand.aic), chosen_label, "arima")
+            except Exception:
+                pass
+            try:
+                holt_cand = Holt(y, initialization_method="estimated").fit()
+                candidate_models["holt"] = (holt_cand, float(holt_cand.aic), "Holt's Linear Trend", "holt")
+            except Exception:
+                pass
+
+        if candidate_models:
+            best_key = min(candidate_models.keys(), key=lambda k: candidate_models[k][1])
+            fit_res_winner, aic_val, chosen_label, chosen_type = candidate_models[best_key]
+        else:
+            fit_res_winner = ARIMA(y, order=(1, 1, 1)).fit()
+            chosen_label = "ARIMA(1, 1, 1)"
+            chosen_type = "arima"
+            aic_val = float(fit_res_winner.aic)
+            
+        if chosen_type in ["holt_winters", "holt"]:
+            fitted = fit_res_winner.fittedvalues
+            forecast = fit_res_winner.forecast(forecast_horizon)
+            residuals = y - fitted
+            se = np.std(residuals)
+            crit_z = stats.norm.ppf(0.5 + confidence_level / 2)
+            lower_ci = forecast - crit_z * se
+            upper_ci = forecast + crit_z * se
+            model_df_val = 3 if chosen_type == "holt_winters" else 2
+            param_estimates = {
+                "chosen_model": chosen_type,
+                "chosen_model_label": chosen_label,
+                "alpha": float(fit_res_winner.params.get("smoothing_level", 0.0)),
+                "beta": float(fit_res_winner.params.get("smoothing_trend", 0.0)),
+                "aic": float(fit_res_winner.aic)
+            }
+            ic_dict = {"aic": float(fit_res_winner.aic), "bic": float(fit_res_winner.bic)}
+        else:
+            model_fit = fit_res_winner
+            fitted = np.array(model_fit.fittedvalues, dtype=float)
+            residuals = np.array(model_fit.resid, dtype=float)
+            burn = max(best_d + best_D * best_s, int(getattr(model_fit, "loglikelihood_burn", 0) or 0)) if chosen_type == "sarima" else best_d
+            burn = min(burn, n - 1)
+            if burn > 0:
+                fitted[:burn] = np.nan
+                residuals[:burn] = np.nan
+            forecast_res = model_fit.get_forecast(steps=forecast_horizon)
+            forecast = forecast_res.predicted_mean
+            ci = forecast_res.conf_int(alpha=1.0 - confidence_level)
+            lower_ci = ci[:, 0]
+            upper_ci = ci[:, 1]
+            model_df_val = best_p + best_q + (best_P + best_Q if chosen_type == "sarima" else 0)
+            param_estimates = {
+                "chosen_model": chosen_type,
+                "chosen_model_label": chosen_label,
+                "order": f"({best_p}, {best_d}, {best_q})",
+                "seasonal_order": f"({best_P}, {best_D}, {best_Q}, {best_s})" if chosen_type == "sarima" else "None"
+            }
+            ic_dict = {
+                "aic": float(model_fit.aic),
+                "bic": float(model_fit.bic),
+                "log_likelihood": float(model_fit.llf)
+            }
     else:
         raise ValueError(f"Unknown or unsupported model type '{model_type}'.")
 
@@ -388,50 +523,136 @@ def search_optimal_arima(
     max_p: int = 3,
     max_d: int = 2,
     max_q: int = 3,
-    seasonal: bool = False,
-    s: int = 12
+    seasonal: bool = True,
+    s: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    Automated grid search minimizing Akaike Information Criterion (AIC).
+    Automated candidate grid search minimizing Akaike Information Criterion (AIC).
+    Evaluates both ARIMA(p,d,q) and Seasonal SARIMA(p,d,q)(P,D,Q)[s] candidate spaces.
     """
     ds = get_dataset(dataset_id)
     if not ds:
         raise ValueError(f"Dataset '{dataset_id}' not found.")
     s_series = pd.to_numeric(ds["df"][target_column], errors='coerce').dropna().values
+    n = len(s_series)
+    inferred_freq = ds["metadata"].get("inferred_freq")
     
-    best_aic = float("inf")
-    best_order = (1, 1, 1)
-    best_seasonal_order = None
-    results_table = []
+    # 1. Infer differencing requirement via ADF
+    from statsmodels.tsa.stattools import adfuller
+    try:
+        adf_stat, adf_p = adfuller(s_series)[:2]
+        rec_d = 0 if adf_p < 0.05 else 1
+    except Exception:
+        rec_d = 1
+        
+    # 2. Resolve seasonal period s
+    if s is None or s < 2:
+        s_val = resolve_period(None, inferred_freq, n)
+    else:
+        s_val = int(s)
+        
+    is_seasonal = bool(seasonal and (n >= 2 * s_val) and (s_val >= 2))
+    rec_D = 1 if is_seasonal else 0
+    
+    # 3. Candidate grid
+    candidate_orders = [
+        (0, rec_d, 1),
+        (1, rec_d, 0),
+        (1, rec_d, 1),
+        (0, rec_d, 2),
+        (2, rec_d, 0),
+        (2, rec_d, 1),
+        (1, rec_d, 2)
+    ]
+    if rec_d == 0:
+        candidate_orders.append((1, 1, 1))
+    else:
+        candidate_orders.append((1, 0, 1))
+        
+    for p in range(min(max_p + 1, 3)):
+        for q in range(min(max_q + 1, 3)):
+            cand = (p, rec_d, q)
+            if cand not in candidate_orders and cand != (0, 0, 0):
+                candidate_orders.append(cand)
+                
+    candidate_seasonal = [
+        (0, rec_D, 1, s_val),
+        (1, rec_D, 0, s_val),
+        (1, rec_D, 1, s_val),
+        (0, 0, 0, 0)
+    ] if is_seasonal else [(0, 0, 0, 0)]
 
-    for p in range(max_p + 1):
-        for d in range(max_d + 1):
-            for q in range(max_q + 1):
-                if p == 0 and d == 0 and q == 0:
-                    continue
+    best_aic = float("inf")
+    best_cand = {"p": 1, "d": rec_d, "q": 1, "P": 0, "D": 0, "Q": 0, "s": 0}
+    results_table = []
+    
+    import warnings
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        for order in candidate_orders:
+            for s_order in candidate_seasonal:
                 try:
-                    fit = ARIMA(s_series, order=(p, d, q)).fit()
+                    if s_order[3] > 0:
+                        trend_term = None if (order[1] + s_order[1]) >= 1 else "c"
+                        fit = SARIMAX(
+                            s_series,
+                            order=order,
+                            seasonal_order=s_order,
+                            trend=trend_term,
+                            enforce_stationarity=False,
+                            enforce_invertibility=False
+                        ).fit(disp=False, maxiter=35)
+                    else:
+                        trend_term = resolve_arima_trend("auto", order[1], s_series)
+                        fit = ARIMA(s_series, order=order, trend=trend_term).fit()
+                        
                     aic_val = float(fit.aic)
                     bic_val = float(fit.bic)
-                    results_table.append({"p": p, "d": d, "q": q, "aic": round(aic_val, 2), "bic": round(bic_val, 2)})
+                    cand_dict = {
+                        "p": order[0], "d": order[1], "q": order[2],
+                        "P": s_order[0], "D": s_order[1], "Q": s_order[2], "s": s_order[3],
+                        "aic": round(aic_val, 2), "bic": round(bic_val, 2)
+                    }
+                    results_table.append(cand_dict)
                     if aic_val < best_aic:
                         best_aic = aic_val
-                        best_order = (p, d, q)
+                        best_cand = cand_dict
                 except Exception:
                     continue
 
     sorted_results = sorted(results_table, key=lambda x: x["aic"])[:8]
     return clean_for_json({
         "dataset_id": dataset_id,
-        "best_p": best_order[0],
-        "best_d": best_order[1],
-        "best_q": best_order[2],
+        "best_p": best_cand["p"],
+        "best_d": best_cand["d"],
+        "best_q": best_cand["q"],
+        "best_P": best_cand.get("P", 0),
+        "best_D": best_cand.get("D", 0),
+        "best_Q": best_cand.get("Q", 0),
+        "best_s": best_cand.get("s", s_val),
+        "is_seasonal": is_seasonal,
         "best_aic": round(best_aic, 2),
         "top_candidates": sorted_results
     })
 
 def generate_python_reproducibility_code(model_type: str, parameters: Dict[str, Any], horizon: int) -> str:
-    if model_type in ["arma", "arima", "ar", "ma"]:
+    if model_type == "auto":
+        chosen_lbl = parameters.get("chosen_model_label", "Auto Best Architecture")
+        chosen_m = parameters.get("chosen_model", "sarima")
+        return f"""# ATSA Reproducibility Script for Auto Best Model Tournament
+# Winning Architecture: {chosen_lbl}
+import pandas as pd
+import numpy as np
+
+# Load series
+df = pd.read_csv("your_timeseries.csv")
+y = df["target_column"].dropna().values
+
+# The platform automated tournament selected: {chosen_lbl}
+print("Selected Architecture: {chosen_lbl}")
+print("Generating {horizon}-step out-of-sample forward horizon forecast...")
+"""
+    elif model_type in ["arma", "arima", "ar", "ma"]:
         p = parameters.get("p", 1)
         d = parameters.get("d", 0)
         q = parameters.get("q", 0)

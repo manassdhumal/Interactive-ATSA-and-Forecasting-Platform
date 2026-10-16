@@ -195,7 +195,7 @@ const MODEL_CONFIGS: Record<string, ModelConfig> = {
     title: 'Seasonal ARIMA — SARIMA(p, d, q)(P, D, Q)[s]',
     math: 'Φ_p(B) Φ̃_P(B^s)(1 - B)^d (1 - B^s)^D Y_t = Θ_q(B) Θ̃_Q(B^s) ε_t',
     description: 'Multiplicative seasonal ARIMA capturing both short-run autocorrelation and long-run seasonal recurrence.',
-    defaultParams: { p: 1, d: 0, q: 1, P: 1, D: 0, Q: 1, s: 12 },
+    defaultParams: { p: 1, d: 1, q: 1, P: 1, D: 1, Q: 1, s: 12 },
     paramFields: [
       { key: 'p', label: 'Non-seasonal AR (p)', type: 'number', min: 0, max: 4 },
       { key: 'd', label: 'Non-seasonal Diff (d)', type: 'number', min: 0, max: 2 },
@@ -247,8 +247,31 @@ export const ModelWorkspacePage: React.FC = () => {
     if (!selectedDataset || !selectedTarget) return;
     setAutoSearching(true);
     try {
-      const res = await apiService.getAutoArima(selectedDataset.id, selectedTarget);
-      setParameters({ ...parameters, p: res.best_p, d: res.best_d, q: res.best_q });
+      const isSarima = modelType === 'sarima';
+      const sVal = parameters.s || defaultParams.s || 12;
+      const res = await apiService.getAutoArima(
+        selectedDataset.id,
+        selectedTarget,
+        3,
+        2,
+        3,
+        isSarima,
+        sVal
+      );
+      if (isSarima) {
+        setParameters({
+          ...parameters,
+          p: res.best_p,
+          d: res.best_d,
+          q: res.best_q,
+          P: res.best_P ?? 1,
+          D: res.best_D ?? 1,
+          Q: res.best_Q ?? 1,
+          s: res.best_s ?? sVal
+        });
+      } else {
+        setParameters({ ...parameters, p: res.best_p, d: res.best_d, q: res.best_q });
+      }
     } catch (err: any) {
       alert(err.response?.data?.detail || 'Auto-search failed');
     } finally {
@@ -387,7 +410,7 @@ export const ModelWorkspacePage: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
-            {(modelType === 'arima' || modelType === 'arma') && (
+            {(modelType === 'arima' || modelType === 'arma' || modelType === 'sarima') && (
               <button
                 onClick={handleAutoArimaSearch}
                 disabled={autoSearching}
@@ -396,10 +419,10 @@ export const ModelWorkspacePage: React.FC = () => {
                     ? 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border-amber-500/30'
                     : 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-200'
                 }`}
-                title="Automated grid search minimizing AIC"
+                title={modelType === 'sarima' ? 'Automated seasonal SARIMA grid search minimizing AIC' : 'Automated grid search minimizing AIC'}
               >
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-                {autoSearching ? 'Searching...' : 'Auto-Search'}
+                {autoSearching ? 'Searching...' : modelType === 'sarima' ? 'Auto-Tune SARIMA' : 'Auto-Search'}
               </button>
             )}
             <button

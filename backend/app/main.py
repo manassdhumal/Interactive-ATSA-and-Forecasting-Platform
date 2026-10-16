@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 import io
 import pandas as pd
 from app.config import settings
@@ -168,9 +169,17 @@ def acf_pacf_endpoint(req: ACFPACFRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/models/auto-arima/{dataset_id}/{target_column}")
-def auto_arima_endpoint(dataset_id: str, target_column: str, max_p: int = 3, max_d: int = 2, max_q: int = 3):
+def auto_arima_endpoint(
+    dataset_id: str,
+    target_column: str,
+    max_p: int = 3,
+    max_d: int = 2,
+    max_q: int = 3,
+    seasonal: bool = True,
+    s: Optional[int] = None
+):
     try:
-        return search_optimal_arima(dataset_id, target_column, max_p, max_d, max_q)
+        return search_optimal_arima(dataset_id, target_column, max_p, max_d, max_q, seasonal, s)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

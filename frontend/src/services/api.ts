@@ -61,15 +61,23 @@ export const apiService = {
     api.post<ACFPACFResult>('/diagnostics/acf_pacf', { dataset_id, target_col, nlags }).then(r => r.data),
 
   // Models
-  getAutoArima: (dataset_id: string, target_column: string, max_p = 3, max_d = 2, max_q = 3) =>
-    api.get<{
+  getAutoArima: (dataset_id: string, target_column: string, max_p = 3, max_d = 2, max_q = 3, seasonal = true, s?: number) => {
+    let url = `/models/auto-arima/${dataset_id}/${target_column}?max_p=${max_p}&max_d=${max_d}&max_q=${max_q}&seasonal=${seasonal}`;
+    if (s) url += `&s=${s}`;
+    return api.get<{
       dataset_id: string;
       best_p: number;
       best_d: number;
       best_q: number;
+      best_P?: number;
+      best_D?: number;
+      best_Q?: number;
+      best_s?: number;
+      is_seasonal?: boolean;
       best_aic: number;
-      top_candidates: { p: number; d: number; q: number; aic: number; bic: number }[];
-    }>(`/models/auto-arima/${dataset_id}/${target_column}?max_p=${max_p}&max_d=${max_d}&max_q=${max_q}`).then(r => r.data),
+      top_candidates: { p: number; d: number; q: number; P?: number; D?: number; Q?: number; s?: number; aic: number; bic: number }[];
+    }>(url).then(r => r.data);
+  },
 
   // Models
   fitModel: (dataset_id: string, target_column: string, model: string, parameters: any, forecast_horizon = 12, confidence_level = 0.95) =>
