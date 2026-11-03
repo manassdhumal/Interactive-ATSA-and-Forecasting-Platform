@@ -600,14 +600,14 @@ export const ModelWorkspacePage: React.FC = () => {
                   />
 
                   <div className="flex items-center gap-2 text-xs font-medium">
-                    <span className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400">
-                      <span className="w-2.5 h-1 bg-blue-500 rounded-full"></span> Actual
+                    <span className="flex items-center gap-1.5" style={{ color: chartTheme.actual }}>
+                      <span className="w-2.5 h-1 rounded-full" style={{ backgroundColor: chartTheme.actual }}></span> Actual
                     </span>
-                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
-                      <span className="w-2.5 h-1 bg-emerald-500 rounded-full"></span> Fitted
+                    <span className="flex items-center gap-1.5" style={{ color: chartTheme.fitted }}>
+                      <span className="w-2.5 h-1 rounded-full" style={{ backgroundColor: chartTheme.fitted }}></span> Fitted
                     </span>
-                    <span className="flex items-center gap-1.5 text-rose-600 dark:text-rose-400">
-                      <span className="w-2.5 h-1 bg-rose-500 rounded-full"></span> Forecast
+                    <span className="flex items-center gap-1.5" style={{ color: chartTheme.forecast }}>
+                      <span className="w-2.5 h-1 rounded-full" style={{ backgroundColor: chartTheme.forecast }}></span> Forecast
                     </span>
                     <a
                       href={apiService.getForecastCsvUrl(fitResult.analysis_id)}
@@ -641,10 +641,10 @@ export const ModelWorkspacePage: React.FC = () => {
                         boxShadow: chartTheme.tooltipShadow
                       }}
                     />
-                    <Area type="monotone" dataKey="band" stroke="none" fill={chartTheme.confidenceFill} name="Interval" />
+                    <Area type="monotone" dataKey="band" stroke={chartTheme.confidenceStroke} strokeOpacity={0.25} fill={chartTheme.confidenceFill} name="Interval" />
                     <Line type="monotone" dataKey="actual" stroke={chartTheme.actual} strokeWidth={2} dot={false} />
                     <Line type="monotone" dataKey="fitted" stroke={chartTheme.fitted} strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="forecast" stroke="#f43f5e" strokeWidth={2.5} dot={{ r: 3 }} />
+                    <Line type="monotone" dataKey="forecast" stroke={chartTheme.forecast} strokeWidth={2.5} dot={{ r: 3, fill: chartTheme.forecast }} />
                     <Brush dataKey="time" height={20} stroke={chartTheme.brushStroke} fill={chartTheme.brushFill} tickFormatter={(t) => t.slice(5, 10)} />
                   </AreaChart>
                 </ResponsiveContainer>
