@@ -42,6 +42,48 @@
     --pill-bg: #f1f5f9;
   }
 
+  :root[data-theme="midnight"] {
+    --bg-body: #070a14;
+    --bg-sidebar: rgba(7, 10, 20, 0.94);
+    --bg-header: rgba(7, 10, 20, 0.88);
+    --bg-card: rgba(13, 18, 36, 0.75);
+    --bg-card-solid: #0d1224;
+    --bg-card-subtle: rgba(15, 21, 42, 0.55);
+    --border-subtle: rgba(129, 140, 248, 0.12);
+    --border-strong: #312e81;
+    --border-focus: rgba(34, 211, 238, 0.45);
+    --input-bg: #0b1021;
+    --input-border: #312e81;
+  }
+
+  :root[data-theme="aurora"] {
+    --bg-body: #061012;
+    --bg-sidebar: rgba(6, 16, 18, 0.94);
+    --bg-header: rgba(6, 16, 18, 0.88);
+    --bg-card: rgba(10, 25, 29, 0.75);
+    --bg-card-solid: #0a191d;
+    --bg-card-subtle: rgba(12, 31, 35, 0.55);
+    --border-subtle: rgba(16, 185, 129, 0.12);
+    --border-strong: #065f46;
+    --border-focus: rgba(192, 132, 252, 0.45);
+    --input-bg: #081518;
+    --input-border: #065f46;
+  }
+
+  :root[data-theme="sunset"] {
+    --bg-body: #11090e;
+    --bg-sidebar: rgba(17, 9, 14, 0.94);
+    --bg-header: rgba(17, 9, 14, 0.88);
+    --bg-card: rgba(28, 15, 23, 0.75);
+    --bg-card-solid: #1c0f17;
+    --bg-card-subtle: rgba(34, 18, 28, 0.55);
+    --border-subtle: rgba(251, 113, 133, 0.12);
+    --border-strong: #881337;
+    --border-focus: rgba(245, 158, 11, 0.45);
+    --input-bg: #170b12;
+    --input-border: #881337;
+  }
+
   body {
     background-color: var(--bg-body);
     color: var(--text-primary);
@@ -58,6 +100,30 @@
       radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.10) 0px, transparent 50%),
       radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.08) 0px, transparent 50%),
       radial-gradient(at 50% 100%, rgba(6, 182, 212, 0.06) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  :root[data-theme="midnight"] body {
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.14) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(34, 211, 238, 0.10) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, rgba(129, 140, 248, 0.08) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  :root[data-theme="aurora"] body {
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.12) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(192, 132, 252, 0.11) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, rgba(56, 189, 248, 0.07) 0px, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  :root[data-theme="sunset"] body {
+    background-image: 
+      radial-gradient(at 0% 0%, rgba(245, 158, 11, 0.11) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(251, 113, 133, 0.11) 0px, transparent 50%),
+      radial-gradient(at 50% 100%, rgba(167, 139, 250, 0.07) 0px, transparent 50%);
     background-attachment: fixed;
   }
 

@@ -1,11 +1,11 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { useTheme } from '../../context/ThemeContext';
-import { Database, Filter, Calendar, Activity, Sun, Moon } from 'lucide-react';
+import { useTheme, ThemeMode } from '../../context/ThemeContext';
+import { Database, Filter, Calendar, Activity, Sun, Moon, Palette } from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { datasets, selectedDataset, selectedTarget, setSelectedDataset, setSelectedTarget } = useApp();
-  const { isDark, toggleTheme } = useTheme();
+  const { theme, isDark, toggleTheme, setTheme, themeOptions, chartTheme } = useTheme();
 
   return (
     <header className="h-16 bg-[var(--bg-header)] backdrop-blur-xl border-b border-[var(--border-subtle)] px-6 flex items-center justify-between sticky top-0 z-20 transition-colors duration-200">
@@ -85,6 +85,39 @@ export const Header: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Forecasting Theme Palette Selector */}
+        <div className="flex items-center gap-2 bg-[var(--input-bg)] border border-[var(--border-subtle)] rounded-xl px-2.5 py-1.5 shadow-xs transition-colors">
+          <Palette className="w-3.5 h-3.5" style={{ color: chartTheme.forecast }} />
+          <div className="flex items-center gap-1">
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: chartTheme.actual }}
+              title="Actual series color"
+            />
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: chartTheme.forecast }}
+              title="Forecast series color"
+            />
+          </div>
+          <select
+            aria-label="Select Forecasting Theme"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value as ThemeMode)}
+            className="bg-transparent text-[var(--text-primary)] text-xs font-semibold focus:outline-none cursor-pointer pr-1"
+          >
+            {themeOptions.map((opt) => (
+              <option
+                key={opt.id}
+                value={opt.id}
+                className={isDark ? 'bg-slate-900 text-slate-200' : 'bg-white text-slate-800'}
+              >
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
 
         {/* Light / Dark Mode Toggle */}
         <button
